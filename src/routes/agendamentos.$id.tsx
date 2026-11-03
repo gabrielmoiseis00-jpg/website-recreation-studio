@@ -23,7 +23,7 @@ function Detalhe() {
   const [w, setW] = useState(0);
   useEffect(() => { const x = get(id); if (x) setA({ ...x, semanas: x.semanas?.length ? x.semanas : emptySemanas() }); }, [id]);
   if (!a) return <AppShell><p className="text-muted-foreground">Agendamento não encontrado.</p></AppShell>;
-  const sem = a.semanas[w];
+  const sem = a.semanas[w]!;
   const upd = (s: typeof sem) => setA({ ...a, semanas: a.semanas.map((x, i) => (i === w ? s : x)) });
 
   return (
