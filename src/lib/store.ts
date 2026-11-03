@@ -12,12 +12,24 @@ export type Agendamento = {
   obs: string;
   status: Status;
   semanas: Semana[];
+  valor?: number;
+  pagStatus?: PagStatus;
+  metodo?: Metodo;
+  comprovante?: string | undefined;
+  comprovanteNome?: string | undefined;
+  pagData?: string | undefined;
 };
-export type User = { usuario: string; papel: "Médico" | "Secretária" };
+export type PagStatus = "pago" | "nao_pago" | "aguardando";
+export type Metodo = "" | "pix" | "dinheiro" | "credito" | "debito" | "boleto" | "convenio" | "transferencia";
+export const PAG_LABEL: Record<PagStatus, string> = { pago: "Pago", nao_pago: "Não pago", aguardando: "Aguardando" };
+export const METODO_LABEL: Record<Metodo, string> = { "": "—", pix: "Pix", dinheiro: "Dinheiro", credito: "Cartão de crédito", debito: "Cartão de débito", boleto: "Boleto", convenio: "Convênio", transferencia: "Transferência" };
+export const isAdmin = (u: User | null) => !!u && (u.papel === "Médico" || u.papel === "Secretária");
+export type User = { usuario: string; papel: "Médico" | "Secretária" | "Aplicação" };
 
 const USERS: Record<string, { senha: string; papel: User["papel"] }> = {
   medico: { senha: "medico123", papel: "Médico" },
   secretaria: { senha: "secretaria123", papel: "Secretária" },
+  aplicacao: { senha: "aplicacao123", papel: "Aplicação" },
 };
 
 const KEY = "agend_data";
@@ -61,3 +73,15 @@ export function exportExcel(rows: Agendamento[]) {
   a.click();
 }
 export const fmtDate = (d: string) => (d ? d.split("-").reverse().join("/") : "");
+
+export const brl = (n = 0) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+export function exportFinanceiro(rows: Agendamento[]) {
+  const head = ["Paciente", "Data consulta", "Valor", "Status", "Método", "Data pagamento", "Comprovante"];
+  const esc = (v: string) => `"${(v || "").replace(/"/g, '""')}"`;
+  const csv = [head, ...rows.map((r) => [r.nome, fmtDate(r.data), (r.valor ?? 0).toFixed(2).replace(".", ","), PAG_LABEL[r.pagStatus ?? "aguardando"], METODO_LABEL[r.metodo ?? ""], fmtDate(r.pagData ?? ""), r.comprovante ? "Sim" : "Não"])]
+    .map((l) => l.map(esc).join(";")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" }));
+  a.download = "financeiro.csv";
+  a.click();
+}

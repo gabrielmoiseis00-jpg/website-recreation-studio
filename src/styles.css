@@ -23,6 +23,7 @@
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-dark-btn: var(--dark-btn);
+  --color-warning: var(--warning);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -70,6 +71,7 @@
   --success: oklch(0.55 0.15 150);
   --success-foreground: oklch(0.99 0 0);
   --dark-btn: oklch(0.22 0.04 265);
+  --warning: oklch(0.7 0.16 70);
   --background: oklch(0.985 0.004 250);
   --foreground: oklch(0.2 0.03 260);
   --card: oklch(1 0 0);
@@ -160,6 +162,9 @@
   .btn-ghost { @apply inline-flex items-center rounded-md px-4 py-2 text-sm hover:bg-accent; }
   .nav-item { @apply flex items-center gap-2 rounded-md px-3 py-2 opacity-85 hover:bg-sidebar-foreground/10; }
   .nav-item-active { @apply bg-sidebar-foreground/15 opacity-100; }
+  .badge-pago { @apply border-success/40 bg-success/10 text-success; }
+  .badge-nao-pago { @apply border-destructive/40 bg-destructive/10 text-destructive; }
+  .badge-aguardando { @apply border-warning/50 bg-warning/10 text-warning; }
   .tab { @apply rounded-md py-2 text-muted-foreground; }
   .tab-active { @apply bg-card font-medium text-foreground shadow-sm; }
 }
