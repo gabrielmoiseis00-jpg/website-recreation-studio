@@ -39,7 +39,7 @@ function Financeiro() {
 
   const anexar = (r: Agendamento, file?: File) => {
     if (!file) return;
-    if (file.size > 3_000_000) return toast.error("Arquivo muito grande (máx. 3 MB)");
+    if (file.size > 3_000_000) { toast.error("Arquivo muito grande (máx. 3 MB)"); return; }
     const fr = new FileReader();
     fr.onload = () => { save({ ...r, comprovante: String(fr.result), comprovanteNome: file.name }); toast.success("Comprovante anexado"); };
     fr.readAsDataURL(file);
