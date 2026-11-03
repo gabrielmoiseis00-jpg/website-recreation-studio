@@ -14,7 +14,7 @@ import { Route as FinanceiroRouteImport } from './routes/financeiro'
 import { Route as AgendamentosIndexRouteImport } from './routes/agendamentos.index'
 import { Route as AgendamentosIdRouteImport } from './routes/agendamentos.$id'
 import { Route as AgendamentosNovoRouteImport } from './routes/agendamentos.novo'
-import { Route as AgendamentosIdEditarRouteImport } from './routes/agendamentos.$id.editar'
+import { Route as AgendamentosEditarIdRouteImport } from './routes/agendamentos.editar.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -41,36 +41,36 @@ const AgendamentosNovoRoute = AgendamentosNovoRouteImport.update({
   path: '/agendamentos/novo',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AgendamentosIdEditarRoute = AgendamentosIdEditarRouteImport.update({
-  id: '/editar',
-  path: '/editar',
-  getParentRoute: () => AgendamentosIdRoute,
+const AgendamentosEditarIdRoute = AgendamentosEditarIdRouteImport.update({
+  id: '/agendamentos/editar/$id',
+  path: '/agendamentos/editar/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/financeiro': typeof FinanceiroRoute
-  '/agendamentos/$id': typeof AgendamentosIdRouteWithChildren
+  '/agendamentos/$id': typeof AgendamentosIdRoute
   '/agendamentos/novo': typeof AgendamentosNovoRoute
   '/agendamentos/': typeof AgendamentosIndexRoute
-  '/agendamentos/$id/editar': typeof AgendamentosIdEditarRoute
+  '/agendamentos/editar/$id': typeof AgendamentosEditarIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/financeiro': typeof FinanceiroRoute
-  '/agendamentos/$id': typeof AgendamentosIdRouteWithChildren
+  '/agendamentos/$id': typeof AgendamentosIdRoute
   '/agendamentos/novo': typeof AgendamentosNovoRoute
   '/agendamentos': typeof AgendamentosIndexRoute
-  '/agendamentos/$id/editar': typeof AgendamentosIdEditarRoute
+  '/agendamentos/editar/$id': typeof AgendamentosEditarIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/financeiro': typeof FinanceiroRoute
-  '/agendamentos/$id': typeof AgendamentosIdRouteWithChildren
+  '/agendamentos/$id': typeof AgendamentosIdRoute
   '/agendamentos/novo': typeof AgendamentosNovoRoute
   '/agendamentos/': typeof AgendamentosIndexRoute
-  '/agendamentos/$id/editar': typeof AgendamentosIdEditarRoute
+  '/agendamentos/editar/$id': typeof AgendamentosEditarIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -80,7 +80,7 @@ export interface FileRouteTypes {
     | '/agendamentos/$id'
     | '/agendamentos/novo'
     | '/agendamentos/'
-    | '/agendamentos/$id/editar'
+    | '/agendamentos/editar/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -88,7 +88,7 @@ export interface FileRouteTypes {
     | '/agendamentos/$id'
     | '/agendamentos/novo'
     | '/agendamentos'
-    | '/agendamentos/$id/editar'
+    | '/agendamentos/editar/$id'
   id:
     | '__root__'
     | '/'
@@ -96,15 +96,16 @@ export interface FileRouteTypes {
     | '/agendamentos/$id'
     | '/agendamentos/novo'
     | '/agendamentos/'
-    | '/agendamentos/$id/editar'
+    | '/agendamentos/editar/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   FinanceiroRoute: typeof FinanceiroRoute
-  AgendamentosIdRoute: typeof AgendamentosIdRouteWithChildren
+  AgendamentosIdRoute: typeof AgendamentosIdRoute
   AgendamentosNovoRoute: typeof AgendamentosNovoRoute
   AgendamentosIndexRoute: typeof AgendamentosIndexRoute
+  AgendamentosEditarIdRoute: typeof AgendamentosEditarIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -144,34 +145,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgendamentosNovoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/agendamentos/$id/editar': {
-      id: '/agendamentos/$id/editar'
-      path: '/editar'
-      fullPath: '/agendamentos/$id/editar'
-      preLoaderRoute: typeof AgendamentosIdEditarRouteImport
-      parentRoute: typeof AgendamentosIdRoute
+    '/agendamentos/editar/$id': {
+      id: '/agendamentos/editar/$id'
+      path: '/agendamentos/editar/$id'
+      fullPath: '/agendamentos/editar/$id'
+      preLoaderRoute: typeof AgendamentosEditarIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
 
-interface AgendamentosIdRouteChildren {
-  AgendamentosIdEditarRoute: typeof AgendamentosIdEditarRoute
-}
-
-const AgendamentosIdRouteChildren: AgendamentosIdRouteChildren = {
-  AgendamentosIdEditarRoute: AgendamentosIdEditarRoute,
-}
-
-const AgendamentosIdRouteWithChildren = AgendamentosIdRoute._addFileChildren(
-  AgendamentosIdRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   FinanceiroRoute: FinanceiroRoute,
-  AgendamentosIdRoute: AgendamentosIdRouteWithChildren,
+  AgendamentosIdRoute: AgendamentosIdRoute,
   AgendamentosNovoRoute: AgendamentosNovoRoute,
   AgendamentosIndexRoute: AgendamentosIndexRoute,
+  AgendamentosEditarIdRoute: AgendamentosEditarIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
