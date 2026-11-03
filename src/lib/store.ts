@@ -15,8 +15,8 @@ export type Agendamento = {
   valor?: number;
   pagStatus?: PagStatus;
   metodo?: Metodo;
-  comprovante?: string;
-  comprovanteNome?: string;
+  comprovante?: string | undefined;
+  comprovanteNome?: string | undefined;
   pagData?: string;
 };
 export type PagStatus = "pago" | "nao_pago" | "aguardando";
