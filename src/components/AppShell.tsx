@@ -1,15 +1,17 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { CalendarDays, List, Plus, LogOut } from "lucide-react";
+import { CalendarDays, List, Plus, LogOut, Wallet } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { getUser, logout, type User } from "@/lib/store";
+import { getUser, isAdmin, logout, type User } from "@/lib/store";
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, adminOnly }: { children: ReactNode; adminOnly?: boolean }) {
   const nav = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   useEffect(() => {
     const u = getUser();
-    if (!u) nav({ to: "/" }); else setUser(u);
-  }, [nav]);
+    if (!u) nav({ to: "/" });
+    else if (adminOnly && !isAdmin(u)) nav({ to: "/agendamentos" });
+    else setUser(u);
+  }, [nav, adminOnly]);
   if (!user) return null;
   return (
     <div className="flex min-h-screen bg-muted">
@@ -24,6 +26,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Link to="/agendamentos/novo" className="nav-item" activeProps={{ className: "nav-item-active" }}>
             <Plus className="h-4 w-4" /> Novo Agendamento
           </Link>
+          {isAdmin(user) && (
+            <Link to="/financeiro" className="nav-item" activeProps={{ className: "nav-item-active" }}>
+              <Wallet className="h-4 w-4" /> Financeiro
+            </Link>
+          )}
         </nav>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">

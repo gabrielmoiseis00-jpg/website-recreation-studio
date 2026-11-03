@@ -36,7 +36,7 @@ function Login() {
         {err && <p className="mt-2 text-sm text-destructive">{err}</p>}
         <button className="btn-primary mt-5 w-full">Entrar</button>
         <p className="mt-5 text-center text-xs text-muted-foreground">
-          Usuários para teste:<br />Médico: medico / medico123<br />Secretária: secretaria / secretaria123
+          Usuários para teste:<br />Médico: medico / medico123<br />Secretária: secretaria / secretaria123<br />Aplicação: aplicacao / aplicacao123
         </p>
       </form>
     </div>
