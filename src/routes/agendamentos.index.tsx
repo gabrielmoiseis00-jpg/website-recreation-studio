@@ -72,7 +72,7 @@ function Lista() {
                     </select>
                   </td>
                   <td className="p-3 text-right whitespace-nowrap">
-                    <Link to="/agendamentos/$id/editar" params={{ id: r.id }} aria-label="Editar cadastro" className="mr-3 inline-flex text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></Link>
+                    <Link to="/agendamentos/editar/$id" params={{ id: r.id }} aria-label="Editar cadastro" className="mr-3 inline-flex text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></Link>
                     <button aria-label="Excluir" onClick={() => { if (confirm("Excluir agendamento?")) { remove(r.id); setRows(list()); } }} className="inline-flex text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                   </td>
                 </tr>

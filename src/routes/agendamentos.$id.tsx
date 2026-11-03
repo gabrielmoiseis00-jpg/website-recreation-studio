@@ -36,7 +36,7 @@ function Detalhe() {
             <p className="text-sm text-muted-foreground">{fmtDate(a.data)} às {a.horario} · {a.telefone}</p>
           </div>
         </div>
-        <Link to="/agendamentos/$id/editar" params={{ id: a.id }} className="btn-ghost border"><Pencil className="h-4 w-4" /> Editar cadastro</Link>
+        <Link to="/agendamentos/editar/$id" params={{ id: a.id }} className="btn-ghost border"><Pencil className="h-4 w-4" /> Editar cadastro</Link>
       </div>
       <div className="rounded-xl border bg-card p-6">
         <h2 className="mb-4 text-lg font-semibold">Progresso Semanal</h2>

@@ -6,7 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { PacienteForm } from "@/components/PacienteForm";
 import { get, upsert, type Agendamento } from "@/lib/store";
 
-export const Route = createFileRoute("/agendamentos/$id/editar")({
+export const Route = createFileRoute("/agendamentos/editar/$id")({
   head: () => ({
     meta: [
       { title: "Editar Cadastro do Paciente — Dr. Ricardo" },
