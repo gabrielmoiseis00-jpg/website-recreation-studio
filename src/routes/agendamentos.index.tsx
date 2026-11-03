@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CalendarPlus, FileSpreadsheet, Search, Trash2 } from "lucide-react";
+import { CalendarPlus, FileSpreadsheet, Pencil, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { exportExcel, fmtDate, list, remove, upsert, type Agendamento, type Status } from "@/lib/store";
@@ -71,8 +71,9 @@ function Lista() {
                       {STATUS.map((x) => <option key={x} value={x}>{x}</option>)}
                     </select>
                   </td>
-                  <td className="p-3 text-right">
-                    <button aria-label="Excluir" onClick={() => { if (confirm("Excluir agendamento?")) { remove(r.id); setRows(list()); } }} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                  <td className="p-3 text-right whitespace-nowrap">
+                    <Link to="/agendamentos/$id/editar" params={{ id: r.id }} aria-label="Editar cadastro" className="mr-3 inline-flex text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></Link>
+                    <button aria-label="Excluir" onClick={() => { if (confirm("Excluir agendamento?")) { remove(r.id); setRows(list()); } }} className="inline-flex text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                   </td>
                 </tr>
               ))}

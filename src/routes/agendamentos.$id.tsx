@@ -28,12 +28,15 @@ function Detalhe() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex items-center gap-2">
-        <Link to="/agendamentos" aria-label="Voltar" className="rounded-md p-1 hover:bg-accent"><ChevronLeft className="h-5 w-5" /></Link>
-        <div>
-          <h1 className="text-2xl font-bold">{a.nome}</h1>
-          <p className="text-sm text-muted-foreground">{fmtDate(a.data)} às {a.horario} · {a.telefone}</p>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Link to="/agendamentos" aria-label="Voltar" className="rounded-md p-1 hover:bg-accent"><ChevronLeft className="h-5 w-5" /></Link>
+          <div>
+            <h1 className="text-2xl font-bold">{a.nome}</h1>
+            <p className="text-sm text-muted-foreground">{fmtDate(a.data)} às {a.horario} · {a.telefone}</p>
+          </div>
         </div>
+        <Link to="/agendamentos/$id/editar" params={{ id: a.id }} className="btn-ghost border"><Pencil className="h-4 w-4" /> Editar cadastro</Link>
       </div>
       <div className="rounded-xl border bg-card p-6">
         <h2 className="mb-4 text-lg font-semibold">Progresso Semanal</h2>
