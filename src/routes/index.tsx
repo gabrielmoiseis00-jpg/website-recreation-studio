@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { CalendarDays, Lock, User } from "lucide-react";
 import { useState } from "react";
 import { login } from "@/lib/store";
+import { OlhoBtn } from "@/components/SenhaInput";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -20,6 +21,7 @@ function Login() {
   const [u, setU] = useState("");
   const [p, setP] = useState("");
   const [err, setErr] = useState("");
+  const [showP, setShowP] = useState(false);
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted px-4">
       <form
