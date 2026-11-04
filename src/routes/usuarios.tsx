@@ -3,6 +3,7 @@ import { Trash2, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
+import { SenhaInput } from "@/components/SenhaInput";
 import { getUser, listContas, saveContas, type Conta } from "@/lib/store";
 
 export const Route = createFileRoute("/usuarios")({
@@ -42,7 +43,7 @@ function Usuarios() {
         }}
       >
         <input className="input" placeholder="Usuário" value={n.usuario} onChange={(e) => setN({ ...n, usuario: e.target.value })} />
-        <input className="input" placeholder="Senha" value={n.senha} onChange={(e) => setN({ ...n, senha: e.target.value })} />
+        <SenhaInput placeholder="Senha" value={n.senha} onChange={(e) => setN({ ...n, senha: e.target.value })} />
         <select className="input" value={n.papel} onChange={(e) => setN({ ...n, papel: e.target.value as Conta["papel"] })}>
           <option>Médico</option><option>Secretária</option><option>Aplicação</option>
         </select>
@@ -62,7 +63,7 @@ function Usuarios() {
             {contas.map((c, i) => (
               <tr key={c.usuario} className="border-b last:border-0">
                 <td className="p-3 font-medium">{c.usuario}</td>
-                <td className="p-3"><input className="input" type={show ? "text" : "password"} value={c.senha} onChange={(e) => upd(i, { senha: e.target.value })} /></td>
+                <td className="p-3">{show ? <input className="input" value={c.senha} onChange={(e) => upd(i, { senha: e.target.value })} /> : <SenhaInput value={c.senha} onChange={(e) => upd(i, { senha: e.target.value })} />}</td>
                 <td className="p-3">
                   <select className="input" value={c.papel} disabled={c.usuario === me} onChange={(e) => upd(i, { papel: e.target.value as Conta["papel"] })}>
                     <option>Médico</option><option>Secretária</option><option>Aplicação</option>

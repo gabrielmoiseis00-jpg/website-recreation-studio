@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { CalendarDays, Lock, User } from "lucide-react";
 import { useState } from "react";
 import { login } from "@/lib/store";
+import { OlhoBtn } from "@/components/SenhaInput";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -20,6 +21,7 @@ function Login() {
   const [u, setU] = useState("");
   const [p, setP] = useState("");
   const [err, setErr] = useState("");
+  const [showP, setShowP] = useState(false);
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted px-4">
       <form
@@ -32,7 +34,7 @@ function Login() {
         <h1 className="text-center text-2xl font-bold">Sistema de Agendamentos</h1>
         <p className="mb-6 text-center text-sm text-muted-foreground">Consultório Dr. Ricardo</p>
         <label className="field-icon"><User className="h-4 w-4" /><input placeholder="Usuário" value={u} onChange={(e) => setU(e.target.value)} /></label>
-        <label className="field-icon mt-3"><Lock className="h-4 w-4" /><input type="password" placeholder="Senha" value={p} onChange={(e) => setP(e.target.value)} /></label>
+        <label className="field-icon mt-3"><Lock className="h-4 w-4" /><input type={showP ? "text" : "password"} placeholder="Senha" value={p} onChange={(e) => setP(e.target.value)} /><OlhoBtn show={showP} onToggle={() => setShowP(!showP)} /></label>
         {err && <p className="mt-2 text-sm text-destructive">{err}</p>}
         <button className="btn-primary mt-5 w-full">Entrar</button>
         <p className="mt-5 text-center text-xs text-muted-foreground">
