@@ -34,8 +34,8 @@ function Usuarios() {
         onSubmit={(e) => {
           e.preventDefault();
           const usuario = n.usuario.trim().toLowerCase();
-          if (!usuario || !n.senha) return toast.error("Preencha usuário e senha");
-          if (contas.some((c) => c.usuario === usuario)) return toast.error("Esse usuário já existe");
+          if (!usuario || !n.senha) { toast.error("Preencha usuário e senha"); return; }
+          if (contas.some((c) => c.usuario === usuario)) { toast.error("Esse usuário já existe"); return; }
           save([...contas, { ...n, usuario }]);
           setN({ usuario: "", senha: "", papel: "Aplicação" });
           toast.success("Usuário criado");
