@@ -1,17 +1,22 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { CalendarDays, List, Plus, LogOut, Wallet } from "lucide-react";
+import { CalendarDays, List, Plus, LogOut, Wallet, Users, Moon, Sun, Palette } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { getUser, isAdmin, logout, type User } from "@/lib/store";
+import { CORES, getTheme, setTheme, type Theme } from "@/lib/theme";
 
-export function AppShell({ children, adminOnly }: { children: ReactNode; adminOnly?: boolean }) {
+export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactNode; adminOnly?: boolean; medicoOnly?: boolean }) {
   const nav = useNavigate();
   const [user, setUser] = useState<User | null>(null);
+  const [theme, setT] = useState<Theme>({ dark: false, hue: 262 });
+  const [paleta, setPaleta] = useState(false);
   useEffect(() => {
+    setT(getTheme());
     const u = getUser();
     if (!u) nav({ to: "/" });
-    else if (adminOnly && !isAdmin(u)) nav({ to: "/agendamentos" });
+    else if ((adminOnly && !isAdmin(u)) || (medicoOnly && u.papel !== "Médico")) nav({ to: "/agendamentos" });
     else setUser(u);
-  }, [nav, adminOnly]);
+  }, [nav, adminOnly, medicoOnly]);
+  const change = (t: Theme) => { setT(t); setTheme(t); };
   if (!user) return null;
   return (
     <div className="flex min-h-screen bg-muted">
@@ -31,12 +36,38 @@ export function AppShell({ children, adminOnly }: { children: ReactNode; adminOn
               <Wallet className="h-4 w-4" /> Financeiro
             </Link>
           )}
+          {user.papel === "Médico" && (
+            <Link to="/usuarios" className="nav-item" activeProps={{ className: "nav-item-active" }}>
+              <Users className="h-4 w-4" /> Usuários
+            </Link>
+          )}
         </nav>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b bg-card px-6 py-4">
           <span className="font-semibold">Sistema de Agendamentos</span>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button aria-label="Cor do site" onClick={() => setPaleta(!paleta)} className="rounded-md p-2 text-muted-foreground hover:bg-accent">
+                <Palette className="h-4 w-4" />
+              </button>
+              {paleta && (
+                <div className="absolute right-0 z-20 mt-2 w-48 rounded-lg border bg-popover p-3 shadow-lg">
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">Cor do site</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {CORES.map((c) => (
+                      <button key={c.hue} title={c.nome} aria-label={c.nome}
+                        onClick={() => change({ ...theme, hue: c.hue })}
+                        className={`h-8 w-8 rounded-full border-2 ${theme.hue === c.hue ? "border-foreground" : "border-transparent"}`}
+                        style={{ background: `oklch(0.55 0.2 ${c.hue})` }} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <button aria-label={theme.dark ? "Modo claro" : "Modo noturno"} onClick={() => change({ ...theme, dark: !theme.dark })} className="rounded-md p-2 text-muted-foreground hover:bg-accent">
+              {theme.dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
             <div className="text-right text-sm leading-tight">
               <div className="font-medium capitalize">{user.usuario}</div>
               <div className="text-xs text-muted-foreground">{user.papel}</div>

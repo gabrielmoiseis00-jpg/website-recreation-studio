@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 
 import { Toaster } from "@/components/ui/sonner";
 import { setupServiceWorker } from "@/lib/pwa";
+import { applyTheme } from "@/lib/theme";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
@@ -121,7 +122,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  useEffect(() => { void setupServiceWorker(); }, []);
+  useEffect(() => { applyTheme(); void setupServiceWorker(); }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
