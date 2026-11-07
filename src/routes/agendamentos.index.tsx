@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { exportExcel, fmtDate, type Agendamento, type Status } from "@/lib/store";
-import { listAppointments, removeAppointment, upsertAppointment } from "@/lib/supabase/data";
+import { getPatientPhotoUrl, listAppointments, removeAppointment, upsertAppointment } from "@/lib/supabase/data";
 
 export const Route = createFileRoute("/agendamentos/")({
   head: () => ({
@@ -28,7 +28,13 @@ function Lista() {
   useEffect(() => {
     let active = true;
     listAppointments()
-      .then((data) => { if (active) setRows(data); })
+      .then(async (data) => {
+        const withPhotoUrls = await Promise.all(data.map(async (appointment) => ({
+          ...appointment,
+          foto: appointment.foto ? await getPatientPhotoUrl(appointment.foto).catch(() => undefined) : undefined,
+        })));
+        if (active) setRows(withPhotoUrls);
+      })
       .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Não foi possível carregar os agendamentos."));
     return () => { active = false; };
   }, []);
