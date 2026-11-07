@@ -17,6 +17,7 @@ import { Route as ProntuariosIndexRouteImport } from './routes/prontuarios.index
 import { Route as RelatoriosRouteImport } from './routes/relatorios'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as RecibosRouteImport } from './routes/recibos'
+import { Route as EvolucaoRouteImport } from './routes/evolucao'
 import { Route as UsuariosRouteImport } from './routes/usuarios'
 import { Route as AgendamentosIndexRouteImport } from './routes/agendamentos.index'
 import { Route as AgendamentosIdRouteImport } from './routes/agendamentos.$id'
@@ -58,6 +59,11 @@ const RecibosRoute = RecibosRouteImport.update({
   path: '/recibos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EvolucaoRoute = EvolucaoRouteImport.update({
+  id: '/evolucao',
+  path: '/evolucao',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FinanceiroRoute = FinanceiroRouteImport.update({
   id: '/financeiro',
   path: '/financeiro',
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/prontuarios/': typeof ProntuariosIndexRoute
   '/relatorios': typeof RelatoriosRoute
   '/configuracoes': typeof ConfiguracoesRoute
+  '/evolucao': typeof EvolucaoRoute
   '/recibos': typeof RecibosRoute
   '/financeiro': typeof FinanceiroRoute
   '/usuarios': typeof UsuariosRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByTo {
   '/prontuarios': typeof ProntuariosIndexRoute
   '/relatorios': typeof RelatoriosRoute
   '/configuracoes': typeof ConfiguracoesRoute
+  '/evolucao': typeof EvolucaoRoute
   '/recibos': typeof RecibosRoute
   '/financeiro': typeof FinanceiroRoute
   '/usuarios': typeof UsuariosRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/prontuarios/': typeof ProntuariosIndexRoute
   '/relatorios': typeof RelatoriosRoute
   '/configuracoes': typeof ConfiguracoesRoute
+  '/evolucao': typeof EvolucaoRoute
   '/recibos': typeof RecibosRoute
   '/financeiro': typeof FinanceiroRoute
   '/usuarios': typeof UsuariosRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/prontuarios/'
     | '/relatorios'
     | '/configuracoes'
+    | '/evolucao'
     | '/recibos'
     | '/financeiro'
     | '/usuarios'
@@ -182,6 +192,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  EvolucaoRoute: typeof EvolucaoRoute
   RecibosRoute: typeof RecibosRoute
   RelatoriosRoute: typeof RelatoriosRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
@@ -241,6 +252,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConfiguracoesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/evolucao': {
+      id: '/evolucao'
+      path: '/evolucao'
+      fullPath: '/evolucao'
+      preLoaderRoute: typeof EvolucaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/recibos': {
       id: '/recibos'
       path: '/recibos'
@@ -294,6 +312,7 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRouteChildren: RootRouteChildren = {
+  EvolucaoRoute: EvolucaoRoute,
   RecibosRoute: RecibosRoute,
   RelatoriosRoute: RelatoriosRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,
