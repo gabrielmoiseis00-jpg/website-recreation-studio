@@ -16,7 +16,8 @@ A integração está em desenvolvimento na branch `feature/supabase-foundation`.
 - Build automático no GitHub Actions.
 
 ### Ainda pendente
-- Substituir a tela de usuários que ainda guarda senhas em `localStorage` por provisionamento seguro no Supabase Auth. Esta etapa foi deixada para o final, conforme combinado.
+- Validar o novo gerenciamento de usuários via funções de servidor e Supabase Auth; nunca usar `localStorage` para senhas.
+- Provisionar a primeira conta Suporte após executar a migração multi-tenant.
 - Remover credenciais locais/de demonstração e rotinas antigas de autenticação do armazenamento local.
 - Validar os fluxos completos de cada papel (médico, secretária e aplicação) com contas de teste.
 - Revisar e testar as políticas RLS e as políticas do Storage em cada papel.
@@ -62,3 +63,31 @@ A matriz deve ser confirmada pelo responsável do consultório. As permissões e
 O repositório foi público. Credenciais antigas de demonstração devem ser consideradas expostas e não podem ser reutilizadas. Tornar o repositório privado não apaga o histórico público.
 
 Não inserir dados reais de pacientes até concluir autenticação/provisionamento, revisão de RLS e Storage, testes por perfil, deploy seguro, backup e avaliação LGPD. Usar exclusivamente dados fictícios durante a validação.
+
+
+## Multi-consultório e conta Suporte
+
+A migração `20261106030000_multi_tenant_support.sql` adiciona:
+- Tabela `clinics` e vínculo `clinic_id` em perfis, pacientes, agendamentos, evolução e financeiro.
+- Papel `suporte`, com leitura/gestão global por políticas RLS.
+- Isolamento de pacientes, agendamentos, evolução, financeiro e arquivos por consultório.
+- Atribuição automática do consultório do usuário em novos registros clínicos feitos por médico/secretária.
+
+A migração associa os dados já existentes ao primeiro consultório criado, desde que já exista um perfil médico. Revise os dados antes de executar. Não execute essa migração mais de uma vez sem revisar, pois ela cria políticas e gatilhos.
+
+### Provisionar a primeira conta Suporte
+
+1. Criar uma conta Auth dedicada em Supabase > Authentication > Users.
+2. Copiar o UUID dessa conta.
+3. Executar no SQL Editor, substituindo os dois valores:
+```sql
+insert into public.profiles (id, username, role, active, clinic_id)
+values ('UUID_DA_CONTA_AUTH', 'suporte', 'suporte', true, null);
+```
+A conta Suporte é independente da conta Médico. Não converta a conta do médico em Suporte.
+
+### Chave de serviço do servidor
+
+As funções de gerenciamento de usuários usam a chave administrativa do Supabase somente no servidor. Configure no Netlify uma variável de ambiente chamada `SUPABASE_SERVICE_ROLE_KEY`, com o valor da chave secreta/service_role do projeto Supabase. Marque-a como sensível. Nunca use prefixo `VITE_`, nunca a coloque no GitHub e nunca a envie pelo chat. Depois de adicionar ou alterar essa variável, gere um novo deploy preview.
+
+O gerenciamento permite que Suporte crie consultórios e médicos e que Médico crie secretárias/usuários de aplicação dentro do próprio consultório. Bloquear um usuário altera o perfil para inativo sem apagar os registros históricos.
