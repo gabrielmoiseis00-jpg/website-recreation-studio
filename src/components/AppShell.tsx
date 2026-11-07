@@ -34,6 +34,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
       if (!active) return;
       const { data } = createClient().auth.onAuthStateChange((_event, session) => {
         if (!session) {
+          if (hasOfflineSession()) { void checkUser(); return; }
           setUser(null);
           nav({ to: "/" });
         } else {
