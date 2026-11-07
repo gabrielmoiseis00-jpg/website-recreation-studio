@@ -1,88 +1,162 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Trash2, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
-import { SenhaInput } from "@/components/SenhaInput";
-import { getUser, listContas, saveContas, type Conta } from "@/lib/store";
+import { getCurrentUser } from "@/lib/auth";
+import { createManagedUser, listManagedUsers, setManagedUserActive } from "@/lib/admin";
+
+type Role = "medico" | "secretaria" | "aplicacao";
+type ManagedUser = {
+  id: string;
+  username: string;
+  email: string;
+  role: "suporte" | Role;
+  active: boolean;
+  clinicId: string | null;
+  createdAt: string;
+};
+
+const roleLabel: Record<ManagedUser["role"], string> = {
+  suporte: "Suporte",
+  medico: "Médico",
+  secretaria: "Secretária",
+  aplicacao: "Aplicação",
+};
 
 export const Route = createFileRoute("/usuarios")({
   head: () => ({
     meta: [
       { title: "Usuários — Sistema de Agendamentos Dr. Ricardo" },
-      { name: "description", content: "Cadastro de usuários e senhas do sistema." },
-      { property: "og:title", content: "Usuários — Dr. Ricardo" },
-      { property: "og:description", content: "Gerencie quem acessa o sistema." },
+      { name: "description", content: "Gerenciamento seguro de usuários e consultórios." },
     ],
   }),
   component: () => <AppShell medicoOnly><Usuarios /></AppShell>,
 });
 
 function Usuarios() {
-  const [contas, setContas] = useState<Conta[]>([]);
-  const [n, setN] = useState<Conta>({ usuario: "", senha: "", papel: "Aplicação" });
-  const [show, setShow] = useState(false);
-  useEffect(() => setContas(listContas()), []);
-  const me = getUser()?.usuario;
-  const save = (c: Conta[]) => { saveContas(c); setContas(c); };
-  const upd = (i: number, p: Partial<Conta>) => save(contas.map((c, j) => (j === i ? { ...c, ...p } : c)));
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [myRole, setMyRole] = useState<"suporte" | "medico" | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    username: "", email: "", password: "", role: "secretaria" as Role, clinicName: "",
+  });
+
+  const refresh = async () => {
+    setLoading(true);
+    try {
+      const [current, rows] = await Promise.all([getCurrentUser(), listManagedUsers()]);
+      if (!current || (current.papel !== "Suporte" && current.papel !== "Médico")) {
+        throw new Error("Acesso permitido somente para Suporte e Médico.");
+      }
+      setMyRole(current.papel === "Suporte" ? "suporte" : "medico");
+      setUsers(rows as ManagedUser[]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível carregar os usuários.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void refresh(); }, []);
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await createManagedUser({ data: {
+        username: form.username,
+        email: form.email,
+        password: form.password,
+        role: form.role,
+        ...(myRole === "suporte" ? { clinicName: form.clinicName } : {}),
+      } });
+      toast.success(myRole === "suporte" ? "Consultório e médico criados com sucesso." : "Usuário criado com sucesso.");
+      setForm({ username: "", email: "", password: "", role: "secretaria", clinicName: "" });
+      await refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível criar o usuário.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleActive = async (user: ManagedUser) => {
+    if (!confirm(user.active ? `Bloquear o acesso de ${user.username}?` : `Reativar ${user.username}?`)) return;
+    try {
+      await setManagedUserActive({ data: { userId: user.id, active: !user.active } });
+      toast.success(user.active ? "Usuário bloqueado." : "Usuário reativado.");
+      await refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível alterar o acesso.");
+    }
+  };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <h1 className="text-2xl font-bold">Usuários</h1>
-      <form
-        className="grid gap-3 rounded-xl border bg-card p-5 md:grid-cols-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const usuario = n.usuario.trim().toLowerCase();
-          if (!usuario || !n.senha) { toast.error("Preencha usuário e senha"); return; }
-          if (contas.some((c) => c.usuario === usuario)) { toast.error("Esse usuário já existe"); return; }
-          save([...contas, { ...n, usuario }]);
-          setN({ usuario: "", senha: "", papel: "Aplicação" });
-          toast.success("Usuário criado");
-        }}
-      >
-        <input className="input" placeholder="Usuário" value={n.usuario} onChange={(e) => setN({ ...n, usuario: e.target.value })} />
-        <SenhaInput placeholder="Senha" value={n.senha} onChange={(e) => setN({ ...n, senha: e.target.value })} />
-        <select className="input" value={n.papel} onChange={(e) => setN({ ...n, papel: e.target.value as Conta["papel"] })}>
-          <option>Médico</option><option>Secretária</option><option>Aplicação</option>
-        </select>
-        <button className="btn-primary"><UserPlus className="h-4 w-4" /> Adicionar</button>
-      </form>
-      <div className="overflow-x-auto rounded-xl border bg-card">
-        <div className="flex justify-end p-3">
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} /> Mostrar senhas
-          </label>
-        </div>
-        <table className="w-full text-sm">
-          <thead className="border-y bg-muted text-left text-muted-foreground">
-            <tr><th className="p-3">Usuário</th><th className="p-3">Senha</th><th className="p-3">Acesso</th><th /></tr>
-          </thead>
-          <tbody>
-            {contas.map((c, i) => (
-              <tr key={c.usuario} className="border-b last:border-0">
-                <td className="p-3 font-medium">{c.usuario}</td>
-                <td className="p-3">{show ? <input className="input" value={c.senha} onChange={(e) => upd(i, { senha: e.target.value })} /> : <SenhaInput value={c.senha} onChange={(e) => upd(i, { senha: e.target.value })} />}</td>
-                <td className="p-3">
-                  <select className="input" value={c.papel} disabled={c.usuario === me} onChange={(e) => upd(i, { papel: e.target.value as Conta["papel"] })}>
-                    <option>Médico</option><option>Secretária</option><option>Aplicação</option>
-                  </select>
-                </td>
-                <td className="p-3 text-right">
-                  {c.usuario !== me && (
-                    <button aria-label="Excluir usuário" className="rounded-md p-2 text-destructive hover:bg-accent"
-                      onClick={() => { if (confirm(`Excluir ${c.usuario}?`)) save(contas.filter((_, j) => j !== i)); }}>
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">{myRole === "suporte" ? "Consultórios e usuários" : "Usuários do consultório"}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {myRole === "suporte"
+            ? "Crie consultórios e cadastre o médico responsável por cada um."
+            : "Cadastre secretárias e usuários de aplicação para este consultório."}
+        </p>
       </div>
-      <p className="text-xs text-muted-foreground">Médico e Secretária têm acesso total (incluindo Financeiro). Aplicação só gerencia pacientes e agendamentos.</p>
+
+      <form onSubmit={submit} className="grid gap-3 rounded-xl border bg-card p-5 md:grid-cols-2">
+        <h2 className="font-semibold md:col-span-2">{myRole === "suporte" ? "Novo consultório e médico" : "Novo usuário"}</h2>
+        {myRole === "suporte" && (
+          <input className="input md:col-span-2" required minLength={2} placeholder="Nome do consultório"
+            value={form.clinicName} onChange={(e) => setForm({ ...form, clinicName: e.target.value })} />
+        )}
+        <input className="input" required minLength={2} placeholder="Nome de usuário"
+          value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+        <input className="input" required type="email" placeholder="E-mail de acesso"
+          value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <input className="input" required type="password" minLength={12} autoComplete="new-password" placeholder="Senha (mínimo 12 caracteres)"
+          value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
+          {myRole === "suporte" ? <option value="medico">Médico</option> : <>
+            <option value="secretaria">Secretária</option>
+            <option value="aplicacao">Aplicação</option>
+          </>}
+        </select>
+        <button disabled={saving || loading || !myRole} className="btn-primary md:col-span-2">
+          {saving ? "Salvando..." : myRole === "suporte" ? "Criar consultório e médico" : "Criar usuário"}
+        </button>
+      </form>
+
+      <section className="overflow-hidden rounded-xl border bg-card">
+        <div className="border-b p-4 font-semibold">Contas cadastradas</div>
+        {loading ? <p className="p-6 text-sm text-muted-foreground">Carregando...</p> : users.length === 0
+          ? <p className="p-6 text-sm text-muted-foreground">Nenhum usuário encontrado.</p>
+          : <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted text-left text-muted-foreground">
+                <tr><th className="p-3">Usuário</th><th className="p-3">E-mail</th><th className="p-3">Perfil</th>{myRole === "suporte" && <th className="p-3">Consultório</th>}<th className="p-3">Situação</th><th className="p-3">Ação</th></tr>
+              </thead>
+              <tbody>
+                {users.map((user) => (
+                  <tr key={user.id} className="border-t">
+                    <td className="p-3 font-medium">{user.username}</td>
+                    <td className="p-3">{user.email}</td>
+                    <td className="p-3">{roleLabel[user.role]}</td>
+                    {myRole === "suporte" && <td className="p-3">{user.clinicId ?? "Acesso geral"}</td>}
+                    <td className="p-3">{user.active ? "Ativo" : "Bloqueado"}</td>
+                    <td className="p-3">
+                      {user.role !== "suporte" && <button className="btn-ghost border px-3 py-1" onClick={() => void toggleActive(user)}>
+                        {user.active ? "Bloquear" : "Reativar"}
+                      </button>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>}
+      </section>
+      <p className="text-xs text-muted-foreground">
+        As senhas são gerenciadas pelo Supabase Auth e nunca ficam visíveis nesta tela. O bloqueio impede novos acessos sem apagar o histórico do usuário.
+      </p>
     </div>
   );
 }
