@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
+import { getOfflineSessionInfo } from "@/lib/auth";
+import { enqueueOfflineChange, listOfflineRecords, listOfflineQueue, removeOfflineQueueItem, deleteOfflineRecord, saveOfflineRecord, updateOfflineQueueItem } from "@/lib/offline-vault";
 import {
   emptySemanas,
   type Agendamento,
@@ -40,6 +42,13 @@ type FinanceRow = {
   receipt_name: string | null;
 };
 
+function isOffline(): boolean { return typeof navigator !== "undefined" && !navigator.onLine; }
+async function offlineContext() {
+  const session = getOfflineSessionInfo();
+  if (!session) throw new Error("Entre online neste dispositivo antes de usar o modo offline.");
+  return session;
+}
+
 function throwIfError(error: { message: string } | null) {
   if (error) throw new Error(error.message);
 }
@@ -74,6 +83,10 @@ function mapWeeks(rows: ProgressRow[]): Semana[] {
 }
 
 export async function listAppointments(): Promise<Agendamento[]> {
+  if (isOffline()) {
+    const session = await offlineContext();
+    return (await listOfflineRecords<Agendamento>(session.userId, "appointments")).map((item) => item.value);
+  }
   const supabase = createClient();
   const access = await getCurrentAccess();
   const [patientsResult, appointmentsResult] = await Promise.all([
@@ -109,7 +122,7 @@ export async function listAppointments(): Promise<Agendamento[]> {
   }
   const financeByAppointment = new Map(finances.map((row) => [row.appointment_id, row]));
 
-  return appointments.flatMap((appointment) => {
+  const mapped = appointments.flatMap((appointment) => {
     const patient = patientById.get(appointment.patient_id);
     if (!patient) return [];
     const finance = financeByAppointment.get(appointment.id);
@@ -132,6 +145,9 @@ export async function listAppointments(): Promise<Agendamento[]> {
       pagData: finance?.payment_date ?? undefined,
     }];
   });
+  const session = getOfflineSessionInfo();
+  if (session) for (const appointment of mapped) await saveOfflineRecord(session.userId, "appointments", appointment.id, appointment);
+  return mapped;
 }
 
 export async function getAppointment(id: string): Promise<Agendamento | undefined> {
@@ -140,6 +156,14 @@ export async function getAppointment(id: string): Promise<Agendamento | undefine
 }
 
 export async function upsertAppointment(appointment: Agendamento): Promise<void> {
+  if (isOffline()) {
+    const session = await offlineContext();
+    if (session.user.papel !== "Suporte" && session.user.permissions?.appointments?.create !== true && session.user.permissions?.appointments?.edit !== true) throw new Error("Você não tem permissão para alterar agendamentos offline.");
+    if (!appointment.nome.trim() || !appointment.telefone.trim() || !appointment.email.trim() || !appointment.data || !appointment.horario) throw new Error("Preencha os dados obrigatórios do paciente e do agendamento.");
+    await saveOfflineRecord(session.userId, "appointments", appointment.id, appointment);
+    await enqueueOfflineChange(session.userId, { entity: "appointment", operation: "upsert", payload: appointment });
+    return;
+  }
   const supabase = createClient();
   const access = await getCurrentAccess();
   const clinicId = await getCurrentClinicId();
@@ -211,6 +235,13 @@ export async function upsertAppointment(appointment: Agendamento): Promise<void>
 }
 
 export async function removeAppointment(id: string): Promise<void> {
+  if (isOffline()) {
+    const session = await offlineContext();
+    if (session.user.papel !== "Suporte" && session.user.permissions?.appointments?.delete !== true) throw new Error("Você não tem permissão para excluir agendamentos.");
+    await deleteOfflineRecord(session.userId, "appointments", id);
+    await enqueueOfflineChange(session.userId, { entity: "appointment", operation: "delete", payload: { id } });
+    return;
+  }
   const { error } = await createClient().from("appointments").delete().eq("id", id);
   throwIfError(error);
 }
@@ -302,6 +333,11 @@ export type PatientRecord = {
 };
 
 export async function listPatients(): Promise<PatientRecord[]> {
+  if (isOffline()) {
+    const session = await offlineContext();
+    if (session.user.papel !== "Suporte" && session.user.permissions?.patients?.view !== true && session.user.permissions?.medical_records?.view !== true) throw new Error("Você não tem permissão para visualizar pacientes.");
+    return (await listOfflineRecords<PatientRecord>(session.userId, "patients")).map((item) => item.value).sort((a, b) => a.nome.localeCompare(b.nome));
+  }
   const supabase = createClient();
   const access = await getCurrentAccess();
   if (!can(access, "patients", "view") && !can(access, "medical_records", "view")) throw new Error("Você não tem permissão para visualizar pacientes.");
@@ -310,7 +346,7 @@ export async function listPatients(): Promise<PatientRecord[]> {
     .select("id, full_name, phone, email, photo_path, created_at")
     .order("full_name", { ascending: true });
   throwIfError(error);
-  return (data ?? []).map((row) => ({
+  const patients = (data ?? []).map((row) => ({
     id: row.id as string,
     nome: row.full_name as string,
     telefone: row.phone as string,
@@ -318,9 +354,22 @@ export async function listPatients(): Promise<PatientRecord[]> {
     foto: (row.photo_path as string | null) ?? undefined,
     criadoEm: row.created_at as string,
   }));
+  const session = getOfflineSessionInfo();
+  if (session) for (const patient of patients) await saveOfflineRecord(session.userId, "patients", patient.id, patient);
+  return patients;
 }
 
 export async function savePatient(patient: Omit<PatientRecord, "criadoEm">): Promise<void> {
+  if (isOffline()) {
+    const session = await offlineContext();
+    const action = patient.id ? "edit" : "create";
+    if (session.user.papel !== "Suporte" && session.user.permissions?.patients?.[action] !== true) throw new Error("Você não tem permissão para salvar pacientes.");
+    const value: PatientRecord = { ...patient, id: patient.id || crypto.randomUUID(), nome: patient.nome.trim(), telefone: patient.telefone.trim(), email: patient.email.trim().toLowerCase(), criadoEm: new Date().toISOString() };
+    if (!value.nome || !value.telefone || !value.email) throw new Error("Preencha nome, telefone e e-mail do paciente.");
+    await saveOfflineRecord(session.userId, "patients", value.id, value);
+    await enqueueOfflineChange(session.userId, { entity: "patient", operation: "upsert", payload: value });
+    return;
+  }
   const supabase = createClient();
   const access = await getCurrentAccess();
   const isEditing = Boolean(patient.id);
@@ -348,12 +397,49 @@ export async function savePatient(patient: Omit<PatientRecord, "criadoEm">): Pro
 }
 
 export async function removePatient(id: string): Promise<void> {
+  if (isOffline()) {
+    const session = await offlineContext();
+    if (session.user.papel !== "Suporte" && session.user.permissions?.patients?.delete !== true) throw new Error("Você não tem permissão para excluir pacientes.");
+    await deleteOfflineRecord(session.userId, "patients", id);
+    await enqueueOfflineChange(session.userId, { entity: "patient", operation: "delete", payload: { id } });
+    return;
+  }
   const access = await getCurrentAccess();
   if (!can(access, "patients", "delete")) throw new Error("Você não tem permissão para excluir pacientes.");
   const { error } = await createClient().from("patients").delete().eq("id", id);
   throwIfError(error);
 }
 
+
+export async function syncOfflineChanges(): Promise<{ synced: number; pending: number }> {
+  if (isOffline()) throw new Error("Conecte-se à internet para sincronizar.");
+  const { data: authData, error } = await createClient().auth.getUser();
+  throwIfError(error);
+  if (!authData.user) throw new Error("Entre novamente online para sincronizar as alterações pendentes.");
+  const userId = authData.user.id;
+  const queue = await listOfflineQueue(userId);
+  let synced = 0;
+  for (const item of queue) {
+    try {
+      if (item.entity === "patient") {
+        const payload = item.payload as PatientRecord | { id: string };
+        if (item.operation === "delete") await removePatient(payload.id);
+        else await savePatient(payload as PatientRecord);
+      } else {
+        const payload = item.payload as Agendamento | { id: string };
+        if (item.operation === "delete") await removeAppointment(payload.id);
+        else await upsertAppointment(payload as Agendamento);
+      }
+      await removeOfflineQueueItem(userId, item.id);
+      synced += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha desconhecida na sincronização.";
+      await updateOfflineQueueItem(userId, { ...item, attempts: item.attempts + 1, lastError: message });
+      break;
+    }
+  }
+  return { synced, pending: (await listOfflineQueue(userId)).length };
+}
 
 export type MedicalRecord = {
   id: string;
