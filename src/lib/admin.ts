@@ -20,9 +20,6 @@ async function getAdminContext() {
   if (profile.role !== "suporte" && profile.role !== "medico") {
     throw new Error("Somente Suporte ou Médico pode gerenciar usuários.");
   }
-  if (profile.role === "medico" && (profile.permissions as Record<string, Record<string, boolean>> | null)?.users?.manage !== true) {
-    throw new Error("Seu usuário não tem permissão para gerenciar outros usuários.");
-  }
 
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const url = process.env.VITE_SUPABASE_URL;
@@ -167,8 +164,7 @@ export const updateManagedUser = createServerFn({ method: "POST" })
 
     let query = admin.from("profiles").select("id, role, clinic_id").eq("id", data.userId);
     if (profile.role !== "suporte") {
-      query = query.eq("clinic_id", profile.clinic_id).in("role", ["secretaria", "aplicacao"]);
-      if (data.role === "medico") throw new Error("O Médico só pode atribuir os perfis Secretária e Aplicação.");
+      query = query.eq("clinic_id", profile.clinic_id).neq("role", "suporte");
     }
     const { data: target, error } = await query.maybeSingle();
     if (error) throw new Error(error.message);
@@ -216,7 +212,7 @@ export const setManagedUserActive = createServerFn({ method: "POST" })
     const { admin, profile, userId } = await getAdminContext();
     if (data.userId === userId) throw new Error("Você não pode bloquear sua própria conta.");
     let query = admin.from("profiles").update({ active: data.active }).eq("id", data.userId);
-    if (profile.role !== "suporte") query = query.eq("clinic_id", profile.clinic_id).in("role", ["secretaria", "aplicacao"]);
+    if (profile.role !== "suporte") query = query.eq("clinic_id", profile.clinic_id).neq("role", "suporte");
     const { data: changed, error } = await query.select("id").maybeSingle();
     if (error) throw new Error(error.message);
     if (!changed) throw new Error("Usuário não encontrado ou sem permissão.");
@@ -235,7 +231,7 @@ export const getManagedUserPermissions = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { admin, profile } = await getAdminContext();
     let query = admin.from("profiles").select("id, role, clinic_id, permissions").eq("id", data.userId);
-    if (profile.role !== "suporte") query = query.eq("clinic_id", profile.clinic_id).in("role", ["secretaria", "aplicacao"]);
+    if (profile.role !== "suporte") query = query.eq("clinic_id", profile.clinic_id).neq("role", "suporte");
     const { data: target, error } = await query.maybeSingle();
     if (error) throw new Error(error.message);
     if (!target || target.role === "suporte") throw new Error("Usuário não encontrado ou sem permissão.");
@@ -251,7 +247,7 @@ export const setManagedUserPermissions = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { admin, profile, userId } = await getAdminContext();
     let query = admin.from("profiles").select("id, role, clinic_id").eq("id", data.userId);
-    if (profile.role !== "suporte") query = query.eq("clinic_id", profile.clinic_id).in("role", ["secretaria", "aplicacao"]);
+    if (profile.role !== "suporte") query = query.eq("clinic_id", profile.clinic_id).neq("role", "suporte");
     const { data: target, error: targetError } = await query.maybeSingle();
     if (targetError) throw new Error(targetError.message);
     if (!target || target.role === "suporte" || target.id === userId) {
