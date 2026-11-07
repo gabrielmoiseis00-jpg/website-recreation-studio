@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { CalendarDays, Lock, Mail } from "lucide-react";
+import { CalendarDays, Lock, Mail, WifiOff } from "lucide-react";
 import { useState } from "react";
 import { login } from "@/lib/auth";
 import { OlhoBtn } from "@/components/SenhaInput";
@@ -22,7 +22,7 @@ function Login() {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);\n  const [isOnline, setIsOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);\n\n  useState(() => {\n    if (typeof window !== "undefined") {\n      const update = () => setIsOnline(navigator.onLine);\n      window.addEventListener("online", update);\n      window.addEventListener("offline", update);\n    }\n    return undefined;\n  });
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,7 +45,7 @@ function Login() {
           <CalendarDays className="h-6 w-6" />
         </div>
         <h1 className="text-center text-2xl font-bold">Sistema de Agendamentos</h1>
-        <p className="mb-6 text-center text-sm text-muted-foreground">Consultório Dr. Ricardo</p>
+        <p className="mb-6 text-center text-sm text-muted-foreground">Consultório Dr. Ricardo</p>\n        {!isOnline && <p className="mb-4 flex items-center justify-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"><WifiOff className="h-4 w-4" /> Sem internet — use seu e-mail e senha já cadastrados neste dispositivo.</p>}
         <label className="field-icon">
           <Mail className="h-4 w-4" />
           <input type="email" autoComplete="username" required placeholder="E-mail" value={email} onChange={(event) => setEmail(event.target.value)} />
