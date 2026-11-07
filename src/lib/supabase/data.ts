@@ -423,24 +423,45 @@ export async function deleteReceipt(path: string): Promise<void> {
 
 const PATIENT_PHOTOS_BUCKET = "patient-photos";
 
-export async function uploadPatientPhoto(file: File): Promise<string> {
-  const supabase = createClient();
-  const access = await getCurrentAccess();
-  if (!can(access, "patients", "create") && !can(access, "patients", "edit")) throw new Error("Sem permissão para enviar fotos de pacientes.");
+async function uploadPatientPhotoToCloud(file: File): Promise<string> {
   const extension = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "jpg";
   const clinicId = await getCurrentClinicId();
   const path = `${clinicId}/${crypto.randomUUID()}.${extension}`;
-  const { error } = await supabase.storage
-    .from(PATIENT_PHOTOS_BUCKET)
-    .upload(path, file, { contentType: file.type, upsert: false });
+  const { error } = await createClient().storage.from(PATIENT_PHOTOS_BUCKET)
+    .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
   throwIfError(error);
   return path;
 }
 
+export async function uploadPatientPhoto(file: File): Promise<string> {
+  if (isOffline()) {
+    const session = await offlineContext();
+    const allowed = session.user.papel === "Suporte" || session.user.permissions?.patients?.create === true || session.user.permissions?.patients?.edit === true;
+    if (!allowed) throw new Error("Sem permissão para enviar fotos de pacientes offline.");
+    const id = crypto.randomUUID();
+    const saved = {
+      id, fileName: file.name, contentType: file.type || "image/jpeg",
+      base64: bytesToBase64(new Uint8Array(await file.arrayBuffer())),
+    };
+    await saveOfflineRecord(session.userId, "patient_photo_files", id, saved);
+    await enqueueOfflineChange(session.userId, { entity: "patient_photo", operation: "upload", payload: saved });
+    return "offline-patient-photo:" + id;
+  }
+  const access = await getCurrentAccess();
+  if (!can(access, "patients", "create") && !can(access, "patients", "edit")) throw new Error("Sem permissão para enviar fotos de pacientes.");
+  return uploadPatientPhotoToCloud(file);
+}
+
 export async function getPatientPhotoUrl(path: string): Promise<string> {
-  const { data, error } = await createClient().storage
-    .from(PATIENT_PHOTOS_BUCKET)
-    .createSignedUrl(path, 60);
+  if (path.startsWith("offline-patient-photo:")) {
+    const session = getOfflineSessionInfo();
+    if (!session) throw new Error("Entre na conta que salvou esta foto neste dispositivo.");
+    const id = path.slice("offline-patient-photo:".length);
+    const saved = await readOfflineRecord<{ base64: string; contentType: string }>(session.userId, "patient_photo_files", id);
+    if (!saved) throw new Error("Foto local não encontrada.");
+    return URL.createObjectURL(new Blob([base64ToBytes(saved.base64)], { type: saved.contentType }));
+  }
+  const { data, error } = await createClient().storage.from(PATIENT_PHOTOS_BUCKET).createSignedUrl(path, 60);
   throwIfError(error);
   return data.signedUrl;
 }
@@ -562,7 +583,32 @@ export async function syncOfflineChanges(): Promise<{ synced: number; pending: n
   let synced = 0;
   for (const item of queue) {
     try {
-      if (item.entity === "receipt") {
+      if (item.entity === "patient_photo") {
+        const payload = item.payload as { id: string; fileName: string; contentType: string; base64: string };
+        const bytes = base64ToBytes(payload.base64);
+        const file = new File([bytes], payload.fileName, { type: payload.contentType });
+        const remotePath = await uploadPatientPhotoToCloud(file);
+        const localReference = "offline-patient-photo:" + payload.id;
+        const pending = await listOfflineQueue(userId);
+        for (const queued of pending) {
+          if (queued.entity === "patient" && queued.operation === "upsert") {
+            const patient = queued.payload as PatientRecord & { __offlineNew?: boolean };
+            if (patient.foto === localReference) {
+              patient.foto = remotePath;
+              queued.payload = patient;
+              await updateOfflineQueueItem(userId, queued);
+            }
+          } else if (queued.entity === "appointment" && queued.operation === "upsert") {
+            const appointment = queued.payload as Agendamento;
+            if (appointment.foto === localReference) {
+              appointment.foto = remotePath;
+              queued.payload = appointment;
+              await updateOfflineQueueItem(userId, queued);
+            }
+          }
+        }
+        await deleteOfflineRecord(userId, "patient_photo_files", payload.id);
+      } else if (item.entity === "receipt") {
         if (item.operation === "delete") {
           const payload = item.payload as { path: string };
           const { error: removeError } = await createClient().storage.from(RECEIPTS_BUCKET).remove([payload.path]);
