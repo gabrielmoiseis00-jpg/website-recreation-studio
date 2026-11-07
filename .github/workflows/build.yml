@@ -28,3 +28,8 @@ jobs:
 
       - name: Build application
         run: bun run build
+
+      - name: Verify Netlify output
+        run: |
+          test -d dist
+          test -d .netlify/v1/functions
