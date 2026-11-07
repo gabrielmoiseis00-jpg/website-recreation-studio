@@ -290,3 +290,66 @@ export async function getPatientPhotoUrl(path: string): Promise<string> {
   throwIfError(error);
   return data.signedUrl;
 }
+
+
+export type PatientRecord = {
+  id: string;
+  nome: string;
+  telefone: string;
+  email: string;
+  foto?: string;
+  criadoEm: string;
+};
+
+export async function listPatients(): Promise<PatientRecord[]> {
+  const supabase = createClient();
+  const access = await getCurrentAccess();
+  if (!can(access, "patients", "view")) throw new Error("Você não tem permissão para visualizar pacientes.");
+  const { data, error } = await supabase
+    .from("patients")
+    .select("id, full_name, phone, email, photo_path, created_at")
+    .order("full_name", { ascending: true });
+  throwIfError(error);
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    nome: row.full_name as string,
+    telefone: row.phone as string,
+    email: row.email as string,
+    foto: (row.photo_path as string | null) ?? undefined,
+    criadoEm: row.created_at as string,
+  }));
+}
+
+export async function savePatient(patient: Omit<PatientRecord, "criadoEm">): Promise<void> {
+  const supabase = createClient();
+  const access = await getCurrentAccess();
+  const isEditing = Boolean(patient.id);
+  const action = isEditing ? "edit" : "create";
+  if (!can(access, "patients", action)) {
+    throw new Error(isEditing ? "Você não tem permissão para editar pacientes." : "Você não tem permissão para cadastrar pacientes.");
+  }
+  const values = {
+    full_name: patient.nome.trim(),
+    phone: patient.telefone.trim(),
+    email: patient.email.trim().toLowerCase(),
+    photo_path: patient.foto || null,
+  };
+  if (!values.full_name || !values.phone || !values.email) {
+    throw new Error("Preencha nome, telefone e e-mail do paciente.");
+  }
+  if (isEditing) {
+    const { error } = await supabase.from("patients").update(values).eq("id", patient.id);
+    throwIfError(error);
+    return;
+  }
+  const clinicId = await getCurrentClinicId();
+  const { error } = await supabase.from("patients").insert({ ...values, clinic_id: clinicId });
+  throwIfError(error);
+}
+
+export async function removePatient(id: string): Promise<void> {
+  const access = await getCurrentAccess();
+  if (!can(access, "patients", "delete")) throw new Error("Você não tem permissão para excluir pacientes.");
+  const { error } = await createClient().from("patients").delete().eq("id", id);
+  throwIfError(error);
+}
