@@ -44,6 +44,7 @@ function Usuarios() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [myRole, setMyRole] = useState<"suporte" | "medico" | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<ManagedUser | null>(null);
   const [permissions, setPermissions] = useState<UserPermissions>({});
@@ -52,6 +53,7 @@ function Usuarios() {
 
   const refresh = async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const current = await getCurrentUser();
       if (!current || (current.papel !== "Suporte" && current.papel !== "Médico")) {
@@ -60,7 +62,9 @@ function Usuarios() {
       setMyRole(current.papel === "Suporte" ? "suporte" : "medico");
       setUsers(await listManagedUsers() as ManagedUser[]);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível carregar os usuários.");
+      const message = error instanceof Error ? error.message : "Não foi possível carregar os usuários.";
+      setLoadError(message);
+      toast.error(message);
     } finally { setLoading(false); }
   };
   useEffect(() => { void refresh(); }, []);
@@ -154,9 +158,11 @@ function Usuarios() {
 
       <section className="overflow-hidden rounded-xl border bg-card">
         <div className="border-b p-4 font-semibold">Contas cadastradas</div>
-        {loading ? <p className="p-6 text-sm text-muted-foreground">Carregando...</p> : users.length === 0
-          ? <p className="p-6 text-sm text-muted-foreground">Nenhum usuário encontrado.</p>
-          : <div className="overflow-x-auto"><table className="w-full text-sm">
+        {loading ? <p className="p-6 text-sm text-muted-foreground">Carregando...</p> : loadError
+          ? <div className="space-y-2 p-6"><p className="text-sm font-semibold text-red-700">Não foi possível carregar as contas.</p><p className="text-sm text-red-700">{loadError}</p><button type="button" className="btn-ghost border px-3 py-2" onClick={() => void refresh()}>Tentar novamente</button></div>
+          : users.length === 0
+            ? <p className="p-6 text-sm text-muted-foreground">A consulta foi concluída, mas não retornou usuários.</p>
+            : <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead className="bg-muted text-left text-muted-foreground"><tr>
               <th className="p-3">Usuário</th><th className="p-3">E-mail</th><th className="p-3">Perfil</th>
               {myRole === "suporte" && <th className="p-3">Clínica</th>}
