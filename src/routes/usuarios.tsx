@@ -13,6 +13,7 @@ type ManagedUser = {
   role: "suporte" | Role;
   active: boolean;
   clinicId: string | null;
+  clinicName: string;
   createdAt: string;
 };
 
@@ -141,7 +142,7 @@ function Usuarios() {
                     <td className="p-3 font-medium">{user.username}</td>
                     <td className="p-3">{user.email}</td>
                     <td className="p-3">{roleLabel[user.role]}</td>
-                    {myRole === "suporte" && <td className="p-3">{user.clinicId ?? "Acesso geral"}</td>}
+                    {myRole === "suporte" && <td className="p-3">{user.clinicName}</td>}
                     <td className="p-3">{user.active ? "Ativo" : "Bloqueado"}</td>
                     <td className="p-3">
                       {user.role !== "suporte" && <button className="btn-ghost border px-3 py-1" onClick={() => void toggleActive(user)}>
