@@ -1,7 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CalendarDays, List, Plus, LogOut, Wallet, Users, Moon, Sun, Palette } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { getUser, isAdmin, logout, type User } from "@/lib/store";
+import { getCurrentUser, logout } from "@/lib/auth";
+import { isAdmin, type User } from "@/lib/store";
 import { CORES, getTheme, setTheme, type Theme } from "@/lib/theme";
 
 export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactNode; adminOnly?: boolean; medicoOnly?: boolean }) {
@@ -9,15 +10,46 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
   const [user, setUser] = useState<User | null>(null);
   const [theme, setT] = useState<Theme>({ dark: false, hue: 262 });
   const [paleta, setPaleta] = useState(false);
+
   useEffect(() => {
+    let active = true;
     setT(getTheme());
-    const u = getUser();
-    if (!u) nav({ to: "/" });
-    else if ((adminOnly && !isAdmin(u)) || (medicoOnly && u.papel !== "Médico")) nav({ to: "/agendamentos" });
-    else setUser(u);
+
+    const checkUser = async () => {
+      const current = await getCurrentUser();
+      if (!active) return;
+      if (!current) {
+        setUser(null);
+        nav({ to: "/" });
+      } else if ((adminOnly && !isAdmin(current)) || (medicoOnly && current.papel !== "Médico")) {
+        nav({ to: "/agendamentos" });
+      } else {
+        setUser(current);
+      }
+    };
+
+    void checkUser();
+    const { data: authListener } = (async () => {
+      const { createClient } = await import("@/lib/supabase/client");
+      return createClient().auth.onAuthStateChange((_event, session) => {
+        if (!session) {
+          setUser(null);
+          nav({ to: "/" });
+        } else {
+          void checkUser();
+        }
+      });
+    })() as unknown as { data: { subscription: { unsubscribe: () => void } } };
+
+    return () => {
+      active = false;
+      authListener.subscription.unsubscribe();
+    };
   }, [nav, adminOnly, medicoOnly]);
+
   const change = (t: Theme) => { setT(t); setTheme(t); };
   if (!user) return null;
+
   return (
     <div className="flex min-h-screen bg-muted">
       <aside className="hidden w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
@@ -72,7 +104,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
               <div className="font-medium capitalize">{user.usuario}</div>
               <div className="text-xs text-muted-foreground">{user.papel}</div>
             </div>
-            <button aria-label="Sair" onClick={() => { logout(); nav({ to: "/" }); }} className="rounded-md p-2 text-muted-foreground hover:bg-accent">
+            <button aria-label="Sair" onClick={async () => { await logout(); nav({ to: "/" }); }} className="rounded-md p-2 text-muted-foreground hover:bg-accent">
               <LogOut className="h-4 w-4" />
             </button>
           </div>
