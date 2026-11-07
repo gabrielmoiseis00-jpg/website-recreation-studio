@@ -87,3 +87,45 @@ export async function login(email: string, password: string): Promise<User> {
   return user;
 }
 
+
+
+export async function getCurrentUser(): Promise<User | null> {
+  if (offlineUser) return offlineUser;
+  const supabase = createClient();
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) return null;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("username, role, active, clinic_id, permissions")
+    .eq("id", authData.user.id)
+    .maybeSingle();
+
+  if (error || !data || !data.active) return null;
+  return toUser(data as Profile);
+}
+
+export function hasOfflineSession(): boolean {
+  return offlineUser !== null && offlineUserId !== null;
+}
+
+export function getOfflineSessionInfo(): { userId: string; user: User } | null {
+  if (offlineUser && offlineUserId) return { userId: offlineUserId, user: offlineUser };
+  return vaultSessionUser && vaultSessionUserId ? { userId: vaultSessionUserId, user: vaultSessionUser } : null;
+}
+
+export async function logout() {
+  if (offlineUserId) {
+    lockOfflineVault(offlineUserId);
+    offlineUser = null;
+    offlineUserId = null;
+    vaultSessionUser = null;
+    vaultSessionUserId = null;
+    return;
+  }
+  lockOfflineVault();
+  vaultSessionUser = null;
+  vaultSessionUserId = null;
+  const { error } = await createClient().auth.signOut();
+  if (error) throw error;
+}
