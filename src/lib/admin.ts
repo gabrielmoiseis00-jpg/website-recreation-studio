@@ -12,13 +12,16 @@ async function getAdminContext() {
 
   const { data: profile, error } = await sessionClient
     .from("profiles")
-    .select("id, role, clinic_id, active")
+    .select("id, role, clinic_id, active, permissions")
     .eq("id", auth.user.id)
     .single();
   if (error || !profile || !profile.active) throw new Error("Perfil ativo não encontrado.");
 
   if (profile.role !== "suporte" && profile.role !== "medico") {
     throw new Error("Somente Suporte ou Médico pode gerenciar usuários.");
+  }
+  if (profile.role === "medico" && (profile.permissions as Record<string, Record<string, boolean>> | null)?.users?.manage !== true) {
+    throw new Error("Seu usuário não tem permissão para gerenciar outros usuários.");
   }
 
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -36,7 +39,7 @@ async function getAdminContext() {
 export const listManagedUsers = createServerFn({ method: "GET" }).handler(async () => {
   const { admin, profile } = await getAdminContext();
   let query = admin.from("profiles").select("id, username, role, active, clinic_id, created_at");
-  if (profile.role !== "suporte") query = query.eq("clinic_id", profile.clinic_id);
+  if (profile.role !== "suporte") query = query.eq("clinic_id", profile.clinic_id).in("role", ["secretaria", "aplicacao"]);
   const { data: profiles, error } = await query.order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
 
