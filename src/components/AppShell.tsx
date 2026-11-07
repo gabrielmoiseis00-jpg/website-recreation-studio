@@ -50,6 +50,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
   }, [nav, adminOnly, medicoOnly]);
 
   const change = (t: Theme) => { setT(t); setTheme(t); };
+  const can = (area: string, action = "view") => user?.papel === "Suporte" || user?.permissions?.[area]?.[action] === true;
   if (!user) return null;
 
   return (
@@ -59,22 +60,20 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
           <CalendarDays className="h-5 w-5" /> Dr. Ricardo
         </div>
         <nav className="flex flex-col gap-1 px-3 text-sm">
-          <Link to="/agendamentos" activeOptions={{ exact: true }} className="nav-item" activeProps={{ className: "nav-item-active" }}>
-            <List className="h-4 w-4" /> Agendamentos
-          </Link>
-          <Link to="/agendamentos/novo" className="nav-item" activeProps={{ className: "nav-item-active" }}>
-            <Plus className="h-4 w-4" /> Novo Agendamento
-          </Link>
-          {isAdmin(user) && (
-            <Link to="/financeiro" className="nav-item" activeProps={{ className: "nav-item-active" }}>
-              <Wallet className="h-4 w-4" /> Financeiro
+          {can("appointments") && <>
+            <Link to="/agendamentos" activeOptions={{ exact: true }} className="nav-item" activeProps={{ className: "nav-item-active" }}>
+              <List className="h-4 w-4" /> Agendamentos
             </Link>
-          )}
-          {(user.papel === "Médico" || user.papel === "Suporte") && (
-            <Link to="/usuarios" className="nav-item" activeProps={{ className: "nav-item-active" }}>
-              <Users className="h-4 w-4" /> {user.papel === "Suporte" ? "Consultórios e usuários" : "Usuários"}
-            </Link>
-          )}
+            {can("appointments", "create") && <Link to="/agendamentos/novo" className="nav-item" activeProps={{ className: "nav-item-active" }}>
+              <Plus className="h-4 w-4" /> Novo Agendamento
+            </Link>}
+          </>}
+          {can("finance") && <Link to="/financeiro" className="nav-item" activeProps={{ className: "nav-item-active" }}>
+            <Wallet className="h-4 w-4" /> Financeiro
+          </Link>}
+          {can("users", "view") && <Link to="/usuarios" className="nav-item" activeProps={{ className: "nav-item-active" }}>
+            <Users className="h-4 w-4" /> Usuários
+          </Link>}
         </nav>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
