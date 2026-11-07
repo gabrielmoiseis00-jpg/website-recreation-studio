@@ -272,8 +272,7 @@ const PATIENT_PHOTOS_BUCKET = "patient-photos";
 
 export async function uploadPatientPhoto(file: File): Promise<string> {
   const supabase = createClient();
-  const { error: roleError } = await getCurrentRole();
-  void roleError;
+  await getCurrentRole();
   const extension = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "jpg";
   const path = `${crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage
