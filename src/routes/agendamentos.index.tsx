@@ -31,7 +31,7 @@ function Lista() {
       .then(async (data) => {
         const withPhotoUrls = await Promise.all(data.map(async (appointment) => ({
           ...appointment,
-          foto: appointment.foto ? await getPatientPhotoUrl(appointment.foto).catch(() => undefined) : undefined,
+          fotoUrl: appointment.foto ? await getPatientPhotoUrl(appointment.foto).catch(() => undefined) : undefined,
         })));
         if (active) setRows(withPhotoUrls);
       })
@@ -73,7 +73,7 @@ function Lista() {
                 <tr key={r.id} className="border-b last:border-0 hover:bg-muted/50">
                   <td className="p-3">
                     <Link to="/agendamentos/$id" params={{ id: r.id }} className="flex items-center gap-2 font-medium hover:text-primary">
-                      {r.foto ? <img src={r.foto} alt="" className="h-8 w-8 rounded-full object-cover" /> : <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-xs text-primary">{r.nome[0]}</span>}
+                      {r.fotoUrl ? <img src={r.fotoUrl} alt="" className="h-8 w-8 rounded-full object-cover" /> : <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-xs text-primary">{r.nome[0]}</span>}
                       {r.nome}
                     </Link>
                   </td>
