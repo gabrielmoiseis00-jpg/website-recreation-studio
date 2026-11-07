@@ -186,36 +186,80 @@ using (
   or (clinic_id is not null and clinic_id = public.current_user_clinic_id())
 );
 
-create policy "patients_tenant_access" on public.patients
-for all to authenticated
+create policy "patients_read_tenant" on public.patients
+for select to authenticated
+using (public.is_support() or (public.is_active_user() and clinic_id = public.current_user_clinic_id()));
+create policy "patients_insert_tenant" on public.patients
+for insert to authenticated
+with check (public.is_support() or (public.is_active_user() and clinic_id = public.current_user_clinic_id()));
+create policy "patients_update_tenant" on public.patients
+for update to authenticated
 using (public.is_support() or (public.is_active_user() and clinic_id = public.current_user_clinic_id()))
 with check (public.is_support() or (public.is_active_user() and clinic_id = public.current_user_clinic_id()));
+create policy "patients_delete_medico_or_support" on public.patients
+for delete to authenticated
+using (public.is_support() or (public.current_user_role() = 'medico' and clinic_id = public.current_user_clinic_id()));
 
-create policy "appointments_tenant_access" on public.appointments
-for all to authenticated
+create policy "appointments_read_tenant" on public.appointments
+for select to authenticated
+using (public.is_support() or (public.is_active_user() and clinic_id = public.current_user_clinic_id()));
+create policy "appointments_insert_tenant" on public.appointments
+for insert to authenticated
+with check (public.is_support() or (public.is_active_user() and clinic_id = public.current_user_clinic_id()));
+create policy "appointments_update_tenant" on public.appointments
+for update to authenticated
 using (public.is_support() or (public.is_active_user() and clinic_id = public.current_user_clinic_id()))
 with check (public.is_support() or (public.is_active_user() and clinic_id = public.current_user_clinic_id()));
+create policy "appointments_delete_admin" on public.appointments
+for delete to authenticated
+using (public.is_support() or (public.current_user_role() in ('medico', 'secretaria') and clinic_id = public.current_user_clinic_id()));
 
-create policy "progress_tenant_clinical_access" on public.patient_weekly_progress
-for all to authenticated
-using (
-  public.is_support()
-  or (clinic_id = public.current_user_clinic_id() and public.current_user_role() in ('medico', 'secretaria'))
-)
-with check (
+create policy "progress_read_tenant" on public.patient_weekly_progress
+for select to authenticated using (
   public.is_support()
   or (clinic_id = public.current_user_clinic_id() and public.current_user_role() in ('medico', 'secretaria'))
 );
+create policy "progress_insert_tenant" on public.patient_weekly_progress
+for insert to authenticated with check (
+  public.is_support()
+  or (clinic_id = public.current_user_clinic_id() and public.current_user_role() in ('medico', 'secretaria'))
+);
+create policy "progress_update_tenant" on public.patient_weekly_progress
+for update to authenticated using (
+  public.is_support()
+  or (clinic_id = public.current_user_clinic_id() and public.current_user_role() in ('medico', 'secretaria'))
+) with check (
+  public.is_support()
+  or (clinic_id = public.current_user_clinic_id() and public.current_user_role() in ('medico', 'secretaria'))
+);
+create policy "progress_delete_medico_or_support" on public.patient_weekly_progress
+for delete to authenticated using (
+  public.is_support()
+  or (clinic_id = public.current_user_clinic_id() and public.current_user_role() = 'medico')
+);
 
-create policy "finance_tenant_clinical_access" on public.appointment_finances
-for all to authenticated
-using (
+create policy "finance_read_tenant" on public.appointment_finances
+for select to authenticated using (
   public.is_support()
   or (clinic_id = public.current_user_clinic_id() and public.current_user_role() in ('medico', 'secretaria'))
-)
-with check (
+);
+create policy "finance_insert_tenant" on public.appointment_finances
+for insert to authenticated with check (
   public.is_support()
   or (clinic_id = public.current_user_clinic_id() and public.current_user_role() in ('medico', 'secretaria'))
+);
+create policy "finance_update_tenant" on public.appointment_finances
+for update to authenticated using (
+  public.is_support()
+  or (clinic_id = public.current_user_clinic_id() and public.current_user_role() in ('medico', 'secretaria'))
+) with check (
+  public.is_support()
+  or (clinic_id = public.current_user_clinic_id() and public.current_user_role() in ('medico', 'secretaria'))
+);
+create policy "finance_delete_medico_or_support" on public.appointment_finances
+for delete to authenticated using (
+  public.is_support()
+  or (clinic_id = public.current_user_clinic_id() and public.current_user_role() = 'medico')
 );
 
 grant select on public.clinics to authenticated;
