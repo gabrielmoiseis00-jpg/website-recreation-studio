@@ -45,10 +45,13 @@ export const listManagedUsers = createServerFn({ method: "GET" }).handler(async 
 
   // Dados auxiliares não podem impedir a lista de usuários de aparecer.
   // A consulta principal de profiles é suficiente para exibir e administrar os acessos.
-  const [{ data: authUsers }, { data: clinics }] = await Promise.all([
+  const [{ data: authUsers, error: authUsersError }, { data: clinics }] = await Promise.all([
     admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
     admin.from("clinics").select("id, name"),
   ]);
+  if (authUsersError) {
+    throw new Error("Falha na autenticação administrativa do Supabase. Verifique se SUPABASE_SERVICE_ROLE_KEY contém a chave service_role do mesmo projeto Supabase usado pelo sistema. Detalhe: " + authUsersError.message);
+  }
   const emailById = new Map((authUsers?.users ?? []).map((user) => [user.id, user.email ?? ""]));
   const clinicNameById = new Map((clinics ?? []).map((clinic) => [clinic.id, clinic.name]));
   return (profiles ?? []).map((item) => ({
