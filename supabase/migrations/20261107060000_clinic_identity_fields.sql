@@ -7,9 +7,9 @@ alter table public.clinics
   add column if not exists logo_url text;
 
 create unique index if not exists clinics_cnpj_unique_idx
-  on public.clinics (regexp_replace(cnpj, '\\D', '', 'g'))
+  on public.clinics (regexp_replace(cnpj, '\D', '', 'g'))
   where cnpj is not null
-    and length(regexp_replace(cnpj, '\\D', '', 'g')) > 0;
+    and length(regexp_replace(cnpj, '\D', '', 'g')) > 0;
 
 drop policy if exists clinics_update_own_settings on public.clinics;
 create policy clinics_update_own_settings on public.clinics
