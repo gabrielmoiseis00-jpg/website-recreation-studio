@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { CalendarDays, Lock, Mail, WifiOff } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { login } from "@/lib/auth";
 import { OlhoBtn } from "@/components/SenhaInput";
 
