@@ -14,6 +14,8 @@ type ManagedUser = {
   active: boolean; clinicId: string | null; clinicName: string; createdAt: string;
 };
 type ManagedClinic = { id: string; name: string };
+type NewClinicForm = { name: string; cnpj: string; email: string; phone: string; address: string; logo_url: string };
+const emptyClinicForm: NewClinicForm = { name: "", cnpj: "", email: "", phone: "", address: "", logo_url: "" };
 const roleLabel: Record<ManagedUser["role"], string> = {
   suporte: "Suporte", medico: "Médico", secretaria: "Secretária", aplicacao: "Aplicação",
 };
@@ -45,7 +47,7 @@ function Usuarios() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [clinics, setClinics] = useState<ManagedClinic[]>([]);
   const [selectedClinicId, setSelectedClinicId] = useState("");
-  const [newClinicName, setNewClinicName] = useState("");
+  const [newClinic, setNewClinic] = useState<NewClinicForm>(emptyClinicForm);
   const [myRole, setMyRole] = useState<"suporte" | "medico" | null>(null);
   const [myUserId, setMyUserId] = useState("");
   const [myPermissions, setMyPermissions] = useState<UserPermissions>({});
@@ -104,12 +106,15 @@ function Usuarios() {
     event.preventDefault();
     setSaving(true);
     try {
-      const created = await createManagedClinic({ data: { name: newClinicName } });
+      const cnpjDigits = newClinic.cnpj.replace(/\\D/g, "");
+      if (cnpjDigits && cnpjDigits.length !== 14) throw new Error("Informe um CNPJ com 14 números ou deixe o campo vazio.");
+      if (newClinic.logo_url && !/^https:\\/\\//i.test(newClinic.logo_url.trim())) throw new Error("O logotipo deve usar um endereço HTTPS.");
+      const created = await createManagedClinic({ data: { ...newClinic, cnpj: cnpjDigits } });
       setClinics((current) => [...current, created as ManagedClinic].sort((a, b) => a.name.localeCompare(b.name)));
       setSelectedClinicId((created as ManagedClinic).id);
       window.localStorage.setItem("storbem-support-clinic-id", (created as ManagedClinic).id);
       window.dispatchEvent(new Event("storbem-clinics-updated"));
-      setNewClinicName("");
+      setNewClinic(emptyClinicForm);
       toast.success("Consultório cadastrado. Agora você pode vincular usuários a ele.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar o consultório.");
@@ -228,9 +233,26 @@ function Usuarios() {
           <h2 className="font-semibold">Consultórios cadastrados</h2>
           <p className="mt-1 text-sm text-muted-foreground">Cada consultório mantém seus próprios usuários e registros, separados dos demais.</p>
         </div>
-        <form onSubmit={submitClinic} className="flex flex-col gap-2 sm:flex-row">
-          <input className="input flex-1" required minLength={2} maxLength={120} placeholder="Nome do novo consultório" value={newClinicName} onChange={(event) => setNewClinicName(event.target.value)} />
-          <button disabled={saving} className="btn-primary">{saving ? "Salvando..." : "Cadastrar consultório"}</button>
+        <form onSubmit={submitClinic} className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2">
+          <label className="space-y-1 text-sm font-medium sm:col-span-2">Nome da clínica *
+            <input className="input w-full" required minLength={2} maxLength={120} placeholder="Nome do novo consultório" value={newClinic.name} onChange={(event) => setNewClinic({ ...newClinic, name: event.target.value })} />
+          </label>
+          <label className="space-y-1 text-sm font-medium">CNPJ
+            <input className="input w-full" inputMode="numeric" maxLength={18} placeholder="00.000.000/0000-00" value={newClinic.cnpj} onChange={(event) => setNewClinic({ ...newClinic, cnpj: event.target.value })} />
+          </label>
+          <label className="space-y-1 text-sm font-medium">E-mail institucional
+            <input className="input w-full" type="email" placeholder="contato@clinica.com.br" value={newClinic.email} onChange={(event) => setNewClinic({ ...newClinic, email: event.target.value })} />
+          </label>
+          <label className="space-y-1 text-sm font-medium">Telefone
+            <input className="input w-full" type="tel" placeholder="(00) 00000-0000" value={newClinic.phone} onChange={(event) => setNewClinic({ ...newClinic, phone: event.target.value })} />
+          </label>
+          <label className="space-y-1 text-sm font-medium">Endereço
+            <input className="input w-full" placeholder="Rua, número, bairro, cidade/UF" value={newClinic.address} onChange={(event) => setNewClinic({ ...newClinic, address: event.target.value })} />
+          </label>
+          <label className="space-y-1 text-sm font-medium sm:col-span-2">Logotipo (URL HTTPS)
+            <input className="input w-full" type="url" placeholder="https://..." value={newClinic.logo_url} onChange={(event) => setNewClinic({ ...newClinic, logo_url: event.target.value })} />
+          </label>
+          <button disabled={saving} className="btn-primary sm:col-span-2">{saving ? "Salvando..." : "Cadastrar clínica"}</button>
         </form>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {clinics.map((clinic) => <button type="button" key={clinic.id} onClick={() => setSelectedClinicId(clinic.id)} className={selectedClinicId === clinic.id ? "rounded-lg border-2 border-primary bg-primary/5 p-3 text-left" : "rounded-lg border p-3 text-left hover:bg-muted"}>
