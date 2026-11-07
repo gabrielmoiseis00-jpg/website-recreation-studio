@@ -171,7 +171,7 @@ function Usuarios() {
       <div>
         <h1 className="text-2xl font-bold">Usuários e permissões</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {myRole === "suporte" ? "Gerencie os usuários da Clínica Storbem." : "Cadastre usuários e configure os acessos da Secretária e da Aplicação."}
+          {myRole === "suporte" ? "Gerencie os usuários da Clínica Storbem." : "Gerencie usuários e permissões da sua clínica. Você pode configurar todas as áreas e ações dos usuários sob sua administração."}
         </p>
       </div>
       {(myRole === "suporte" || myRole === "medico") && <section className="space-y-3 rounded-xl border bg-card p-5">
@@ -180,7 +180,7 @@ function Usuarios() {
           <p className="mt-1 text-sm text-muted-foreground">
             {myRole === "suporte"
               ? "Sua conta possui acesso total ao sistema."
-              : "Estas são as permissões administrativas da sua conta de Médico. Você pode administrar os usuários vinculados à sua clínica."}
+              : "Sua conta de Médico tem acesso administrativo completo à clínica e pode configurar todas as permissões da Secretária e da Aplicação."}
           </p>
         </div>
         <div className="grid gap-2 md:grid-cols-2">
@@ -277,23 +277,49 @@ function Usuarios() {
               </button>
             </div>
           </label>
-          <div className="md:col-span-2 space-y-3">
-            <h3 className="font-semibold">Permissões do usuário</h3>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className="btn-ghost border px-3 py-2" onClick={() => setEditPermissions(Object.fromEntries(areas.map((area) => [area.key, Object.fromEntries(area.actions.map((action) => [action, true]))])))}>Liberar todas</button>
-              <button type="button" className="btn-ghost border px-3 py-2" onClick={() => setEditPermissions(Object.fromEntries(areas.map((area) => [area.key, Object.fromEntries(area.actions.map((action) => [action, false]))])))}>Bloquear todas</button>
+          <div className="md:col-span-2 space-y-4 rounded-2xl border bg-muted/20 p-4 md:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-base font-bold tracking-tight">Permissões de acesso</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Escolha exatamente quais áreas e ações este usuário poderá utilizar.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100" onClick={() => setEditPermissions(Object.fromEntries(areas.map((area) => [area.key, Object.fromEntries(area.actions.map((action) => [action, true]))])))}><span aria-hidden="true">✓</span> Liberar tudo</button>
+                <button type="button" className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 shadow-sm transition hover:bg-rose-100" onClick={() => setEditPermissions(Object.fromEntries(areas.map((area) => [area.key, Object.fromEntries(area.actions.map((action) => [action, false]))])))}><span aria-hidden="true">×</span> Bloquear tudo</button>
+              </div>
             </div>
-            {permissionsLoading ? <p className="text-sm text-muted-foreground">Carregando permissões...</p> : <div className="grid gap-3 md:grid-cols-2">
-              {areas.map((area) => <div key={area.key} className="rounded-lg border p-3">
-                <h4 className="font-medium">{area.label}</h4>
-                <div className="mt-2 space-y-2">
-                  {area.actions.map((action) => <label key={action} className="flex items-center justify-between gap-3 text-sm">
-                    <span>{actionLabel[action]}</span>
-                    <input type="checkbox" className="h-4 w-4 accent-primary" checked={editPermissions[area.key]?.[action] === true} onChange={(e) => setEditPermissions((current) => ({ ...current, [area.key]: { ...current[area.key], [action]: e.target.checked } }))} />
-                  </label>)}
-                </div>
-              </div>)}
-            </div>}
+            <div className="grid gap-3 lg:grid-cols-2">
+              {areas.map((area, index) => {
+                const enabledCount = area.actions.filter((action) => editPermissions[area.key]?.[action] === true).length;
+                const totalCount = area.actions.length;
+                const areaEnabled = editPermissions[area.key]?.view === true;
+                return <div key={area.key} className="overflow-hidden rounded-xl border bg-card shadow-sm transition hover:shadow-md">
+                  <div className="flex items-center justify-between gap-3 border-b bg-muted/30 px-4 py-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">{String(index + 1).padStart(2, "0")}</span>
+                      <div className="min-w-0">
+                        <h4 className="truncate text-sm font-semibold">{area.label}</h4>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{enabledCount} de {totalCount} permissões liberadas</p>
+                      </div>
+                    </div>
+                    <span className={enabledCount === totalCount ? "shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-800" : enabledCount > 0 ? "shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800" : "shrink-0 rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold text-muted-foreground"}>
+                      {enabledCount === totalCount ? "Completo" : enabledCount > 0 ? "Parcial" : "Bloqueado"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3">
+                    {area.actions.map((action) => <label key={action} className={editPermissions[area.key]?.[action] === true ? "flex cursor-pointer items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2.5 text-xs font-medium text-foreground transition hover:border-primary/50" : "flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-xs font-medium text-muted-foreground transition hover:bg-muted/50"}>
+                      <input type="checkbox" className="h-4 w-4 shrink-0 rounded accent-primary" checked={editPermissions[area.key]?.[action] === true} onChange={(e) => setEditPermissions((current) => ({ ...current, [area.key]: { ...current[area.key], [action]: e.target.checked } }))} />
+                      <span>{actionLabel[action]}</span>
+                    </label>)}
+                  </div>
+                  {area.actions.length > 1 && <div className="border-t px-4 py-2">
+                    <button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => setEditPermissions((current) => ({ ...current, [area.key]: Object.fromEntries(area.actions.map((action) => [action, true])) }))}>Liberar todas nesta área</button>
+                    <span className="px-2 text-muted-foreground">·</span>
+                    <button type="button" className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline" onClick={() => setEditPermissions((current) => ({ ...current, [area.key]: Object.fromEntries(area.actions.map((action) => [action, false])) }))}>Bloquear área</button>
+                  </div>}
+                </div>;
+              })}
+            </div>
           </div>
           <div className="flex flex-wrap gap-2 md:col-span-2">
             <button disabled={saving || permissionsLoading} className="btn-primary">{saving ? "Salvando..." : "Salvar todas as alterações"}</button>
