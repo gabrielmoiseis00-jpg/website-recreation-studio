@@ -323,13 +323,21 @@ async function getCurrentClinicId(): Promise<string> {
   throwIfError(error);
   if (data?.clinic_id) return data.clinic_id as string;
 
-  // A conta de Suporte não pertence a uma clínica específica. Este sistema
-  // opera com uma única Clínica Storbem, então novos registros usam essa unidade.
   if (data?.role === "suporte") {
-    const { data: clinics, error: clinicsError } = await supabase.from("clinics").select("id").limit(2);
-    throwIfError(clinicsError);
-    if (clinics?.length === 1) return clinics[0].id as string;
-    throw new Error("Não foi possível identificar a Clínica Storbem. Verifique se existe apenas uma clínica cadastrada.");
+    const selectedClinicId = typeof window !== "undefined"
+      ? window.localStorage.getItem("storbem-support-clinic-id")
+      : null;
+    if (!selectedClinicId) {
+      throw new Error("Selecione um consultório no cabeçalho antes de criar registros ou enviar arquivos.");
+    }
+    const { data: clinic, error: clinicError } = await supabase.from("clinics")
+      .select("id").eq("id", selectedClinicId).maybeSingle();
+    throwIfError(clinicError);
+    if (!clinic) {
+      window.localStorage.removeItem("storbem-support-clinic-id");
+      throw new Error("O consultório selecionado não está disponível para esta conta. Selecione outro.");
+    }
+    return clinic.id as string;
   }
   throw new Error("Esta conta precisa estar vinculada a um consultório antes de enviar arquivos.");
 }
