@@ -63,6 +63,24 @@ update public.profiles
 set permissions = public.default_user_permissions(role)
 where permissions = '{}'::jsonb;
 
+
+create or replace function public.set_profile_default_permissions()
+returns trigger language plpgsql
+set search_path = public
+as $$
+begin
+  if new.permissions is null or new.permissions = '{}'::jsonb then
+    new.permissions := public.default_user_permissions(new.role);
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_set_default_permissions on public.profiles;
+create trigger profiles_set_default_permissions
+before insert or update of role on public.profiles
+for each row execute function public.set_profile_default_permissions();
+
 create or replace function public.has_permission(area_key text, action_key text default 'view')
 returns boolean
 language sql stable security definer
