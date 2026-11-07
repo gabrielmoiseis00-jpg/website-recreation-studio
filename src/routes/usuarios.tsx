@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { getCurrentUser } from "@/lib/auth";
-import { createManagedUser, listManagedUsers, setManagedUserActive } from "@/lib/admin";
+import { createManagedClinic, createManagedUser, listManagedClinics, listManagedUsers, setManagedUserActive } from "@/lib/admin";
 
 type Role = "medico" | "secretaria" | "aplicacao";
 type ManagedUser = {
@@ -36,6 +36,8 @@ export const Route = createFileRoute("/usuarios")({
 
 function Usuarios() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
+  const [newClinicName, setNewClinicName] = useState("");
   const [myRole, setMyRole] = useState<"suporte" | "medico" | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -58,6 +60,7 @@ function Usuarios() {
 
       const rows = await listManagedUsers();
       setUsers(rows as ManagedUser[]);
+      if (current.papel === "Suporte") setClinics(await listManagedClinics());
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível carregar os usuários.");
     } finally {
@@ -86,6 +89,18 @@ function Usuarios() {
       toast.error(error instanceof Error ? error.message : "Não foi possível criar o usuário.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const addClinic = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    try {
+      await createManagedClinic({ data: { name: newClinicName } });
+      setNewClinicName("");
+      toast.success("Consultório cadastrado com sucesso.");
+      await refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar o consultório.");
     }
   };
 
@@ -121,8 +136,8 @@ function Usuarios() {
           <select className="input md:col-span-2" required value={form.clinicId}
             onChange={(e) => setForm({ ...form, clinicId: e.target.value })}>
             <option value="">Selecione o consultório</option>
-            {[...new Map(users.filter((user) => user.clinicId).map((user) => [user.clinicId, user.clinicName])).entries()].map(([id, name]) => (
-              <option key={id} value={id}>{name}</option>
+            {clinics.map((clinic) => (
+              <option key={clinic.id} value={clinic.id}>{clinic.name}</option>
             ))}
           </select>
         )}
@@ -146,6 +161,15 @@ function Usuarios() {
           {saving ? "Salvando..." : myRole === "suporte" && form.role === "medico" ? "Criar consultório e médico" : "Criar usuário"}
         </button>
       </form>
+
+      {myRole === "suporte" && (
+        <form onSubmit={addClinic} className="flex flex-col gap-3 rounded-xl border bg-card p-5 sm:flex-row">
+          <input className="input flex-1" required minLength={2} maxLength={120}
+            placeholder="Nome do novo consultório"
+            value={newClinicName} onChange={(e) => setNewClinicName(e.target.value)} />
+          <button className="btn-primary" type="submit">Adicionar consultório</button>
+        </form>
+      )}
 
       <section className="overflow-hidden rounded-xl border bg-card">
         <div className="border-b p-4 font-semibold">Contas cadastradas</div>
