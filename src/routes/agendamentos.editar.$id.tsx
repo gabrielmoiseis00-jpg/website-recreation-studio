@@ -55,7 +55,7 @@ function Editar() {
         submitLabel="Salvar Alterações"
         onSubmit={(v) => {
           void upsertAppointment({ ...a, ...v }).then(() => {
-            toast.success("Cadastro do paciente atualizado");
+            toast.success(typeof navigator !== "undefined" && !navigator.onLine ? "Alteração salva neste dispositivo. Aguardando sincronização." : "Cadastro do paciente atualizado");
             nav({ to: "/agendamentos/$id", params: { id: a.id } });
           }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o cadastro."));
         }}
