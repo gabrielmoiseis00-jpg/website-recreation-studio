@@ -179,7 +179,7 @@ export async function upsertAppointment(appointment: Agendamento): Promise<void>
         full_name: appointment.nome,
         phone: appointment.telefone,
         email: appointment.email,
-        photo_path: appointment.foto || null,
+        photo_path: appointment.foto && !appointment.foto.startsWith("data:") ? appointment.foto : null,
       })
       .select("id")
       .single();
