@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { CalendarDays, List, Plus, LogOut, Wallet, Users, Moon, Sun, Palette } from "lucide-react";
+import { CalendarDays, List, Plus, LogOut, Wallet, Users, Moon, Sun, Palette, LayoutDashboard, ContactRound } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { getCurrentUser, logout } from "@/lib/auth";
 import { type User } from "@/lib/store";
@@ -59,7 +59,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
         <div className="flex items-center gap-2 px-5 py-6 text-lg font-semibold">
           <CalendarDays className="h-5 w-5" /> Dr. Ricardo
         </div>
-        <nav className="flex flex-col gap-1 px-3 text-sm">
+        <nav className="flex flex-col gap-1 px-3 text-sm">\n          {can("dashboard") && <Link to="/dashboard" className="nav-item" activeProps={{ className: "nav-item-active" }}><LayoutDashboard className="h-4 w-4" /> Painel inicial</Link>}
           {can("appointments") && <>
             <Link to="/agendamentos" activeOptions={{ exact: true }} className="nav-item" activeProps={{ className: "nav-item-active" }}>
               <List className="h-4 w-4" /> Agendamentos
@@ -68,7 +68,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
               <Plus className="h-4 w-4" /> Novo Agendamento
             </Link>}
           </>}
-          {can("finance") && <Link to="/financeiro" className="nav-item" activeProps={{ className: "nav-item-active" }}>
+          {can("patients") && <Link to="/pacientes" className="nav-item" activeProps={{ className: "nav-item-active" }}><ContactRound className="h-4 w-4" /> Pacientes</Link>}\n          {can("finance") && <Link to="/financeiro" className="nav-item" activeProps={{ className: "nav-item-active" }}>
             <Wallet className="h-4 w-4" /> Financeiro
           </Link>}
           {can("users", "view") && <Link to="/usuarios" className="nav-item" activeProps={{ className: "nav-item-active" }}>
