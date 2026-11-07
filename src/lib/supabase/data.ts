@@ -44,7 +44,7 @@ function throwIfError(error: { message: string } | null) {
   if (error) throw new Error(error.message);
 }
 
-async function getCurrentRole(): Promise<"medico" | "secretaria" | "aplicacao"> {
+async function getCurrentRole(): Promise<"suporte" | "medico" | "secretaria" | "aplicacao"> {
   const supabase = createClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
   throwIfError(authError);
@@ -55,7 +55,7 @@ async function getCurrentRole(): Promise<"medico" | "secretaria" | "aplicacao"> 
     .eq("id", authData.user.id)
     .single();
   throwIfError(error);
-  const profile = data as { role: "medico" | "secretaria" | "aplicacao"; active: boolean };
+  const profile = data as { role: "suporte" | "medico" | "secretaria" | "aplicacao"; active: boolean };
   if (!profile.active) throw new Error("Seu usuário está inativo. Procure o administrador.");
   return profile.role;
 }
@@ -239,12 +239,10 @@ export async function removeAppointment(id: string): Promise<void> {
 }
 
 
-const RECEIPTS_BUCKET = "appointment-receipts";
-
-export async function uploadReceipt(appointmentId: string, file: File): Promise<string> {
+async function getCurrentClinicId(): Promise<string> {\n  const { data, error } = await createClient().from("profiles").select("clinic_id").single();\n  throwIfError(error);\n  if (!data?.clinic_id) throw new Error("Selecione um consultório antes de enviar arquivos.");\n  return data.clinic_id as string;\n}\n\nconst RECEIPTS_BUCKET = "appointment-receipts";\n\nexport async function uploadReceipt(appointmentId: string, file: File): Promise<string> {
   const supabase = createClient();
   const extension = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "file";
-  const path = `${appointmentId}/${crypto.randomUUID()}.${extension}`;
+  const clinicId = await getCurrentClinicId();\n  const path = `${clinicId}/${appointmentId}/${crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage
     .from(RECEIPTS_BUCKET)
     .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
@@ -274,7 +272,7 @@ export async function uploadPatientPhoto(file: File): Promise<string> {
   const supabase = createClient();
   await getCurrentRole();
   const extension = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "jpg";
-  const path = `${crypto.randomUUID()}.${extension}`;
+  const clinicId = await getCurrentClinicId();\n  const path = `${clinicId}/${crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage
     .from(PATIENT_PHOTOS_BUCKET)
     .upload(path, file, { contentType: file.type, upsert: false });
