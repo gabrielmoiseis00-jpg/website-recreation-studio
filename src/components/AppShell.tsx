@@ -59,7 +59,8 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
         <div className="flex items-center gap-2 px-5 py-6 text-lg font-semibold">
           <CalendarDays className="h-5 w-5" /> Dr. Ricardo
         </div>
-        <nav className="flex flex-col gap-1 px-3 text-sm">\n          {can("dashboard") && <Link to="/dashboard" className="nav-item" activeProps={{ className: "nav-item-active" }}><LayoutDashboard className="h-4 w-4" /> Painel inicial</Link>}
+        <nav className="flex flex-col gap-1 px-3 text-sm">
+          {can("dashboard") && <Link to="/dashboard" className="nav-item" activeProps={{ className: "nav-item-active" }}><LayoutDashboard className="h-4 w-4" /> Painel inicial</Link>}
           {can("appointments") && <>
             <Link to="/agendamentos" activeOptions={{ exact: true }} className="nav-item" activeProps={{ className: "nav-item-active" }}>
               <List className="h-4 w-4" /> Agendamentos
@@ -68,7 +69,11 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
               <Plus className="h-4 w-4" /> Novo Agendamento
             </Link>}
           </>}
-          {can("medical_records") && <Link to="/prontuarios" className="nav-item" activeProps={{ className: "nav-item-active" }}><FileText className="h-4 w-4" /> Prontuários</Link>}\n          {can("patients") && <Link to="/pacientes" className="nav-item" activeProps={{ className: "nav-item-active" }}><ContactRound className="h-4 w-4" /> Pacientes</Link>}\n          {can("reports") && <Link to="/relatorios" className="nav-item" activeProps={{ className: "nav-item-active" }}><ChartNoAxesCombined className="h-4 w-4" /> Relatórios</Link>}\n          {can("settings") && <Link to="/configuracoes" className="nav-item" activeProps={{ className: "nav-item-active" }}><Settings className="h-4 w-4" /> Configurações</Link>}\n          {can("finance") && <Link to="/financeiro" className="nav-item" activeProps={{ className: "nav-item-active" }}>
+          {can("medical_records") && <Link to="/prontuarios" className="nav-item" activeProps={{ className: "nav-item-active" }}><FileText className="h-4 w-4" /> Prontuários</Link>}
+          {can("patients") && <Link to="/pacientes" className="nav-item" activeProps={{ className: "nav-item-active" }}><ContactRound className="h-4 w-4" /> Pacientes</Link>}
+          {can("reports") && <Link to="/relatorios" className="nav-item" activeProps={{ className: "nav-item-active" }}><ChartNoAxesCombined className="h-4 w-4" /> Relatórios</Link>}
+          {can("settings") && <Link to="/configuracoes" className="nav-item" activeProps={{ className: "nav-item-active" }}><Settings className="h-4 w-4" /> Configurações</Link>}
+          {can("finance") && <Link to="/financeiro" className="nav-item" activeProps={{ className: "nav-item-active" }}>
             <Wallet className="h-4 w-4" /> Financeiro
           </Link>}
           {can("users", "view") && <Link to="/usuarios" className="nav-item" activeProps={{ className: "nav-item-active" }}>
