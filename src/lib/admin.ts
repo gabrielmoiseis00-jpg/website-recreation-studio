@@ -116,8 +116,6 @@ export const createManagedUser = createServerFn({ method: "POST" })
       const { error: renameError } = await admin.from("clinics")
         .update({ name: "Clínica Storbem" }).eq("id", clinicId);
       if (renameError) throw new Error(renameError.message);
-    } else if (data.role === "medico") {
-      throw new Error("Somente Suporte pode cadastrar outro médico/consultório.");
     }
 
     if (!clinicId) throw new Error("Sua conta não está vinculada a um consultório.");
