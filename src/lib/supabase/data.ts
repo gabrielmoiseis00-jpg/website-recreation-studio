@@ -597,6 +597,9 @@ export async function syncOfflineChanges(): Promise<{ synced: number; pending: n
               patient.foto = remotePath;
               queued.payload = patient;
               await updateOfflineQueueItem(userId, queued);
+              await saveOfflineRecord(userId, "patients", patient.id, patient);
+              const inMemory = queue.find((entry) => entry.id === queued.id);
+              if (inMemory) inMemory.payload = patient;
             }
           } else if (queued.entity === "appointment" && queued.operation === "upsert") {
             const appointment = queued.payload as Agendamento;
@@ -604,6 +607,9 @@ export async function syncOfflineChanges(): Promise<{ synced: number; pending: n
               appointment.foto = remotePath;
               queued.payload = appointment;
               await updateOfflineQueueItem(userId, queued);
+              await saveOfflineRecord(userId, "appointments", appointment.id, appointment);
+              const inMemory = queue.find((entry) => entry.id === queued.id);
+              if (inMemory) inMemory.payload = appointment;
             }
           }
         }
