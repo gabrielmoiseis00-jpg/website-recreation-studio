@@ -274,7 +274,7 @@ export async function eraseOfflineVault(userId: string): Promise<void> {
 export type OfflineQueueItem = {
   id: string;
   userId: string;
-  entity: "patient" | "appointment";
+  entity: "patient" | "appointment" | "medical_record";
   operation: "upsert" | "delete";
   payload: unknown;
   createdAt: string;
