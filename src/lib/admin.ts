@@ -12,7 +12,7 @@ async function getAdminContext() {
 
   const { data: profile, error } = await sessionClient
     .from("profiles")
-    .select("id, role, clinic_id, active, permissions")
+    .select("id, username, role, clinic_id, active, permissions")
     .eq("id", auth.user.id)
     .single();
   if (error || !profile || !profile.active) throw new Error("Perfil ativo não encontrado.");
@@ -311,17 +311,44 @@ export const deleteManagedUser = createServerFn({ method: "POST" })
     return { success: true };
   });
 
-const deleteClinicSchema = z.object({ clinicId: z.string().uuid() });
+const deleteClinicSchema = z.object({
+  clinicId: z.string().uuid(),
+  adminUsername: z.string().trim().min(2).max(80),
+  adminPassword: z.string().min(1).max(128),
+  confirmClinicName: z.string().trim().min(2).max(120),
+});
 export const deleteManagedClinic = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => deleteClinicSchema.parse(input))
   .handler(async ({ data }) => {
-    const { admin, profile } = await getAdminContext();
+    const { admin, profile, userId } = await getAdminContext();
     if (profile.role !== "suporte") throw new Error("Somente Suporte pode excluir consultórios.");
+    if (data.adminUsername !== profile.username) throw new Error("O usuário informado não corresponde à conta Suporte conectada.");
+
+    const { data: authAccount, error: authAccountError } = await admin.auth.admin.getUserById(userId);
+    if (authAccountError || !authAccount.user?.email) {
+      throw new Error("Não foi possível validar a conta administrativa. Entre novamente.");
+    }
+    const url = process.env.VITE_SUPABASE_URL;
+    const publishableKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    if (!url || !publishableKey) {
+      throw new Error("A chave pública do Supabase não está configurada no servidor para validar a senha.");
+    }
+    const verificationClient = createSupabaseClient(url, publishableKey, {
+      auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+    });
+    const { error: passwordError } = await verificationClient.auth.signInWithPassword({
+      email: authAccount.user.email,
+      password: data.adminPassword,
+    });
+    if (passwordError) throw new Error("Senha do administrador incorreta. Nenhuma exclusão foi realizada.");
 
     const { data: clinic, error: clinicError } = await admin.from("clinics")
       .select("id, name").eq("id", data.clinicId).maybeSingle();
     if (clinicError) throw new Error(clinicError.message);
     if (!clinic) throw new Error("Consultório não encontrado.");
+    if (data.confirmClinicName !== clinic.name) {
+      throw new Error("O nome digitado não corresponde exatamente ao consultório. Nenhuma exclusão foi realizada.");
+    }
 
     const checks = await Promise.all([
       { label: "usuários", promise: admin.from("profiles").select("id", { count: "exact", head: true }).eq("clinic_id", data.clinicId) },
