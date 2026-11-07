@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { getCurrentUser } from "@/lib/auth";
 import {
-  createManagedUser, listManagedUsers, setManagedUserActive,
+  createManagedUser, listManagedUsers, listManagedClinics, createManagedClinic, setManagedUserActive,
   getManagedUserPermissions, setManagedUserPermissions, getMyManagedPermissions, updateManagedUser, type UserPermissions,
 } from "@/lib/admin";
 
@@ -13,6 +13,7 @@ type ManagedUser = {
   id: string; username: string; email: string; role: "suporte" | Role;
   active: boolean; clinicId: string | null; clinicName: string; createdAt: string;
 };
+type ManagedClinic = { id: string; name: string };
 const roleLabel: Record<ManagedUser["role"], string> = {
   suporte: "Suporte", medico: "Médico", secretaria: "Secretária", aplicacao: "Aplicação",
 };
@@ -42,6 +43,9 @@ export const Route = createFileRoute("/usuarios")({
 
 function Usuarios() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [clinics, setClinics] = useState<ManagedClinic[]>([]);
+  const [selectedClinicId, setSelectedClinicId] = useState("");
+  const [newClinicName, setNewClinicName] = useState("");
   const [myRole, setMyRole] = useState<"suporte" | "medico" | null>(null);
   const [myUserId, setMyUserId] = useState("");
   const [myPermissions, setMyPermissions] = useState<UserPermissions>({});
@@ -68,8 +72,13 @@ function Usuarios() {
       }
       const role = current.papel === "Suporte" ? "suporte" : "medico";
       setMyRole(role);
-      const [managedUsers, ownAccess] = await Promise.all([listManagedUsers(), getMyManagedPermissions()]);
+      const [managedUsers, ownAccess, managedClinics] = await Promise.all([
+        listManagedUsers(), getMyManagedPermissions(),
+        role === "suporte" ? listManagedClinics() : Promise.resolve([]),
+      ]);
       setUsers(managedUsers as ManagedUser[]);
+      setClinics(managedClinics as ManagedClinic[]);
+      setSelectedClinicId((current) => current || (managedClinics[0]?.id ?? ""));
       setMyUserId(ownAccess.userId);
       setMyPermissions(ownAccess.permissions);
     } catch (error) {
@@ -83,12 +92,26 @@ function Usuarios() {
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setSaving(true);
     try {
-      await createManagedUser({ data: form });
+      await createManagedUser({ data: { ...form, ...(myRole === "suporte" ? { clinicId: selectedClinicId } : {}) } });
       toast.success("Usuário criado com sucesso.");
       setForm({ username: "", email: "", password: "", role: "secretaria" });
       await refresh();
     } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível criar o usuário."); }
     finally { setSaving(false); }
+  };
+
+  const submitClinic = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      const created = await createManagedClinic({ data: { name: newClinicName } });
+      setClinics((current) => [...current, created as ManagedClinic].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedClinicId((created as ManagedClinic).id);
+      setNewClinicName("");
+      toast.success("Consultório cadastrado. Agora você pode vincular usuários a ele.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar o consultório.");
+    } finally { setSaving(false); }
   };
 
   const toggleActive = async (user: ManagedUser) => {
@@ -198,6 +221,23 @@ function Usuarios() {
         </div>
       </section>}
 
+      {myRole === "suporte" && <section className="space-y-4 rounded-xl border bg-card p-5">
+        <div>
+          <h2 className="font-semibold">Consultórios cadastrados</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Cada consultório mantém seus próprios usuários e registros, separados dos demais.</p>
+        </div>
+        <form onSubmit={submitClinic} className="flex flex-col gap-2 sm:flex-row">
+          <input className="input flex-1" required minLength={2} maxLength={120} placeholder="Nome do novo consultório" value={newClinicName} onChange={(event) => setNewClinicName(event.target.value)} />
+          <button disabled={saving} className="btn-primary">{saving ? "Salvando..." : "Cadastrar consultório"}</button>
+        </form>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {clinics.map((clinic) => <button type="button" key={clinic.id} onClick={() => setSelectedClinicId(clinic.id)} className={selectedClinicId === clinic.id ? "rounded-lg border-2 border-primary bg-primary/5 p-3 text-left" : "rounded-lg border p-3 text-left hover:bg-muted"}>
+            <span className="block font-medium">{clinic.name}</span>
+            <span className="text-xs text-muted-foreground">{selectedClinicId === clinic.id ? "Selecionado para novos usuários" : "Selecionar consultório"}</span>
+          </button>)}
+        </div>
+      </section>}
+
       <form onSubmit={submit} className="grid gap-3 rounded-xl border bg-card p-5 md:grid-cols-2">
         <h2 className="font-semibold md:col-span-2">Novo usuário</h2>
         <input className="input" required minLength={2} placeholder="Nome de usuário" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
@@ -208,11 +248,17 @@ function Usuarios() {
             {showCreatePassword ? <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0112 5c5 0 9 4 10 7-0.4 1.2-1.4 2.6-2.8 3.7M6.2 6.2C3.8 7.5 2.4 9.5 2 12c1 3 5 7 10 7 1.3 0 2.5-.3 3.6-.8"/></svg> : <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>}
           </button>
         </div>
+        {myRole === "suporte" && <label className="space-y-1 text-sm font-medium md:col-span-2">Vincular usuário ao consultório
+          <select className="input w-full" required value={selectedClinicId} onChange={(event) => setSelectedClinicId(event.target.value)}>
+            <option value="">Selecione um consultório</option>
+            {clinics.map((clinic) => <option key={clinic.id} value={clinic.id}>{clinic.name}</option>)}
+          </select>
+        </label>}
         <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
           <option value="medico">Médico</option>
           <option value="secretaria">Secretária</option><option value="aplicacao">Aplicação</option>
         </select>
-        <button disabled={saving || loading || !myRole} className="btn-primary md:col-span-2">{saving ? "Salvando..." : "Criar usuário"}</button>
+        <button disabled={saving || loading || !myRole || (myRole === "suporte" && (!selectedClinicId || clinics.length === 0))} className="btn-primary md:col-span-2">{saving ? "Salvando..." : "Criar usuário"}</button>
       </form>
 
       <section className="overflow-hidden rounded-xl border bg-card">
