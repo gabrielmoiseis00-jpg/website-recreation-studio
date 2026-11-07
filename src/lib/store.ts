@@ -27,18 +27,6 @@ export const METODO_LABEL: Record<Metodo, string> = { "": "—", pix: "Pix", din
 export const isAdmin = (u: User | null) => !!u && (u.papel === "Suporte" || u.papel === "Médico" || u.papel === "Secretária");
 export type User = { usuario: string; papel: "Suporte" | "Médico" | "Secretária" | "Aplicação"; clinicId?: string };
 
-export type Conta = { usuario: string; senha: string; papel: User["papel"] };
-const DEFAULT_USERS: Conta[] = [
-  { usuario: "medico", senha: "medico123", papel: "Médico" },
-  { usuario: "secretaria", senha: "secretaria123", papel: "Secretária" },
-  { usuario: "aplicacao", senha: "aplicacao123", papel: "Aplicação" },
-];
-const AKEY = "agend_contas";
-export function listContas(): Conta[] {
-  try { const v = JSON.parse(localStorage.getItem(AKEY) || "null"); return Array.isArray(v) ? v : DEFAULT_USERS; } catch { return DEFAULT_USERS; }
-}
-export function saveContas(c: Conta[]) { localStorage.setItem(AKEY, JSON.stringify(c)); }
-
 const KEY = "agend_data";
 const UKEY = "agend_user";
 
