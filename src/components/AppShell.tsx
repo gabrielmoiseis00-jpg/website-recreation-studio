@@ -2,7 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { CalendarDays, List, Plus, LogOut, Wallet, Users, Moon, Sun, Palette } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { getCurrentUser, logout } from "@/lib/auth";
-import { isAdmin, type User } from "@/lib/store";
+import { type User } from "@/lib/store";
 import { CORES, getTheme, setTheme, type Theme } from "@/lib/theme";
 
 export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactNode; adminOnly?: boolean; medicoOnly?: boolean }) {
@@ -21,7 +21,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
       if (!current) {
         setUser(null);
         nav({ to: "/" });
-      } else if ((adminOnly && !isAdmin(current)) || (medicoOnly && current.papel !== "Médico" && current.papel !== "Suporte")) {
+      } else if ((adminOnly && current.papel !== "Suporte" && current.permissions?.finance?.view !== true) || (medicoOnly && current.papel !== "Médico" && current.papel !== "Suporte")) {
         nav({ to: "/agendamentos" });
       } else {
         setUser(current);
