@@ -18,7 +18,7 @@ function Dashboard() {
       .finally(() => { if(alive) setLoading(false); });
     return () => { alive = false; };
   }, []);
-  const today = new Date().toISOString().slice(0,10);
+  const now = new Date();\n  const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
   const todayRows = useMemo(() => rows.filter(r => r.data === today && r.status !== "cancelado").sort((a,b)=>a.horario.localeCompare(b.horario)), [rows,today]);
   const uniquePatients = new Set(rows.map(r=>r.email.toLowerCase())).size;
   const pending = rows.filter(r=>r.status==="agendado" || r.status==="confirmado").length;
