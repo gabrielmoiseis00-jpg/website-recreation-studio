@@ -351,13 +351,13 @@ function base64ToBytes(value: string): Uint8Array {
   return bytes;
 }
 
-async function uploadReceiptToCloud(appointmentId: string, file: File): Promise<string> {
+async function uploadReceiptToCloud(appointmentId: string, file: File, stableId?: string): Promise<string> {
   const supabase = createClient();
   const extension = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "file";
   const clinicId = await getCurrentClinicId();
-  const path = `${clinicId}/${appointmentId}/${crypto.randomUUID()}.${extension}`;
+  const path = `${clinicId}/${appointmentId}/${stableId || crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage.from(RECEIPTS_BUCKET)
-    .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
+    .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: Boolean(stableId) });
   throwIfError(error);
   return path;
 }
@@ -431,12 +431,12 @@ export async function deleteReceipt(path: string): Promise<void> {
 
 const PATIENT_PHOTOS_BUCKET = "patient-photos";
 
-async function uploadPatientPhotoToCloud(file: File): Promise<string> {
+async function uploadPatientPhotoToCloud(file: File, stableId?: string): Promise<string> {
   const extension = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "jpg";
   const clinicId = await getCurrentClinicId();
-  const path = `${clinicId}/${crypto.randomUUID()}.${extension}`;
+  const path = `${clinicId}/${stableId || crypto.randomUUID()}.${extension}`;
   const { error } = await createClient().storage.from(PATIENT_PHOTOS_BUCKET)
-    .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
+    .upload(path, file, { contentType: file.type || "image/jpeg", upsert: Boolean(stableId) });
   throwIfError(error);
   return path;
 }
@@ -595,7 +595,7 @@ export async function syncOfflineChanges(): Promise<{ synced: number; pending: n
         const payload = item.payload as { id: string; fileName: string; contentType: string; base64: string };
         const bytes = base64ToBytes(payload.base64);
         const file = new File([bytes], payload.fileName, { type: payload.contentType });
-        const remotePath = await uploadPatientPhotoToCloud(file);
+        const remotePath = await uploadPatientPhotoToCloud(file, payload.id);
         const localReference = "offline-patient-photo:" + payload.id;
         const pending = await listOfflineQueue(userId);
         for (const queued of pending) {
@@ -631,7 +631,7 @@ export async function syncOfflineChanges(): Promise<{ synced: number; pending: n
           const payload = item.payload as OfflineReceiptFile;
           const bytes = base64ToBytes(payload.base64);
           const file = new File([bytes], payload.fileName, { type: payload.contentType });
-          const remotePath = await uploadReceiptToCloud(payload.appointmentId, file);
+          const remotePath = await uploadReceiptToCloud(payload.appointmentId, file, payload.id);
           const localReference = OFFLINE_RECEIPT_PREFIX + payload.id;
           const pending = await listOfflineQueue(userId);
           for (const queued of pending) {
