@@ -153,35 +153,77 @@ with check (public.is_support() or (public.has_permission('finance','edit') and 
 create policy "finance_delete_permission" on public.appointment_finances for delete to authenticated
 using (public.is_support() or (public.has_permission('finance','delete') and clinic_id = public.current_user_clinic_id()));
 
--- Receipts and patient images have separate storage controls.
+-- Receipt permissions are enforced separately for each storage operation.
 drop policy if exists "tenant_receipts_access" on storage.objects;
-create policy "tenant_receipts_access" on storage.objects for all to authenticated
+create policy "receipts_read_permission" on storage.objects for select to authenticated
 using (bucket_id = 'appointment-receipts' and (
   public.is_support() or (
     (storage.foldername(name))[1] = public.current_user_clinic_id()::text
     and public.has_permission('receipts','view')
   )
-))
+));
+create policy "receipts_insert_permission" on storage.objects for insert to authenticated
 with check (bucket_id = 'appointment-receipts' and (
   public.is_support() or (
     (storage.foldername(name))[1] = public.current_user_clinic_id()::text
     and public.has_permission('receipts','create')
   )
 ));
+create policy "receipts_update_permission" on storage.objects for update to authenticated
+using (bucket_id = 'appointment-receipts' and (
+  public.is_support() or (
+    (storage.foldername(name))[1] = public.current_user_clinic_id()::text
+    and public.has_permission('receipts','edit')
+  )
+))
+with check (bucket_id = 'appointment-receipts' and (
+  public.is_support() or (
+    (storage.foldername(name))[1] = public.current_user_clinic_id()::text
+    and public.has_permission('receipts','edit')
+  )
+));
+create policy "receipts_delete_permission" on storage.objects for delete to authenticated
+using (bucket_id = 'appointment-receipts' and (
+  public.is_support() or (
+    (storage.foldername(name))[1] = public.current_user_clinic_id()::text
+    and public.has_permission('receipts','delete')
+  )
+));
 
 -- Patient photos follow patient permissions, not receipt permissions.
 drop policy if exists "tenant_patient_photos_access" on storage.objects;
-create policy "tenant_patient_photos_access" on storage.objects for all to authenticated
+create policy "patient_photos_read_permission" on storage.objects for select to authenticated
 using (bucket_id = 'patient-photos' and (
   public.is_support() or (
     (storage.foldername(name))[1] = public.current_user_clinic_id()::text
     and public.has_permission('patients','view')
+  )
+));
+create policy "patient_photos_insert_permission" on storage.objects for insert to authenticated
+with check (bucket_id = 'patient-photos' and (
+  public.is_support() or (
+    (storage.foldername(name))[1] = public.current_user_clinic_id()::text
+    and public.has_permission('patients','create')
+  )
+));
+create policy "patient_photos_update_permission" on storage.objects for update to authenticated
+using (bucket_id = 'patient-photos' and (
+  public.is_support() or (
+    (storage.foldername(name))[1] = public.current_user_clinic_id()::text
+    and public.has_permission('patients','edit')
   )
 ))
 with check (bucket_id = 'patient-photos' and (
   public.is_support() or (
     (storage.foldername(name))[1] = public.current_user_clinic_id()::text
     and public.has_permission('patients','edit')
+  )
+));
+create policy "patient_photos_delete_permission" on storage.objects for delete to authenticated
+using (bucket_id = 'patient-photos' and (
+  public.is_support() or (
+    (storage.foldername(name))[1] = public.current_user_clinic_id()::text
+    and public.has_permission('patients','delete')
   )
 ));
 
