@@ -28,19 +28,6 @@ export const isAdmin = (u: User | null) => !!u && (u.papel === "Suporte" || u.pa
 export type User = { usuario: string; papel: "Suporte" | "Médico" | "Secretária" | "Aplicação"; clinicId?: string };
 
 const KEY = "agend_data";
-const UKEY = "agend_user";
-
-export function login(usuario: string, senha: string): User | null {
-  const u = listContas().find((c) => c.usuario === usuario.trim().toLowerCase());
-  if (!u || u.senha !== senha) return null;
-  const user = { usuario: usuario.trim().toLowerCase(), papel: u.papel };
-  localStorage.setItem(UKEY, JSON.stringify(user));
-  return user;
-}
-export const logout = () => localStorage.removeItem(UKEY);
-export function getUser(): User | null {
-  try { return JSON.parse(localStorage.getItem(UKEY) || "null"); } catch { return null; }
-}
 export function list(): Agendamento[] {
   try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; }
 }
