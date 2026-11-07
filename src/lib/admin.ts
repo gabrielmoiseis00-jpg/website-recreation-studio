@@ -322,11 +322,23 @@ export const deleteManagedClinic = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { admin, profile, userId } = await getAdminContext();
     if (profile.role !== "suporte") throw new Error("Somente Suporte pode excluir consultórios.");
-    if (data.adminUsername !== profile.username) throw new Error("O usuário informado não corresponde à conta Suporte conectada.");
 
     const { data: authAccount, error: authAccountError } = await admin.auth.admin.getUserById(userId);
     if (authAccountError || !authAccount.user?.email) {
       throw new Error("Não foi possível validar a conta administrativa. Entre novamente.");
+    }
+    // Aceita o nome de usuário do perfil ou o e-mail da própria conta autenticada.
+    // A autorização continua vinculada ao ID da sessão e à role Suporte.
+    const suppliedIdentity = data.adminUsername.trim().toLowerCase();
+    const metadata = authAccount.user.user_metadata ?? {};
+    const validIdentities = [
+      profile.username,
+      authAccount.user.email,
+      typeof metadata.username === "string" ? metadata.username : "",
+      typeof metadata.user_name === "string" ? metadata.user_name : "",
+    ].map((value) => String(value ?? "").trim().toLowerCase()).filter(Boolean);
+    if (!validIdentities.includes(suppliedIdentity)) {
+      throw new Error("Informe o nome de usuário cadastrado ou o e-mail da conta Suporte conectada.");
     }
     const url = process.env.VITE_SUPABASE_URL;
     const publishableKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
