@@ -7,6 +7,7 @@ export type Agendamento = {
   telefone: string;
   email: string;
   foto?: string;
+  fotoUrl?: string;
   data: string;
   horario: string;
   obs: string;
