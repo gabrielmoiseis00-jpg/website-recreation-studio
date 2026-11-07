@@ -44,6 +44,22 @@ function throwIfError(error: { message: string } | null) {
   if (error) throw new Error(error.message);
 }
 
+async function getCurrentRole(): Promise<"medico" | "secretaria" | "aplicacao"> {
+  const supabase = createClient();
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  throwIfError(authError);
+  if (!authData.user) throw new Error("Sua sessão expirou. Entre novamente.");
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("role, active")
+    .eq("id", authData.user.id)
+    .single();
+  throwIfError(error);
+  const profile = data as { role: "medico" | "secretaria" | "aplicacao"; active: boolean };
+  if (!profile.active) throw new Error("Seu usuário está inativo. Procure o administrador.");
+  return profile.role;
+}
+
 function mapWeeks(rows: ProgressRow[]): Semana[] {
   const weeks = emptySemanas();
   for (const row of rows) {
@@ -59,20 +75,25 @@ function mapWeeks(rows: ProgressRow[]): Semana[] {
 
 export async function listAppointments(): Promise<Agendamento[]> {
   const supabase = createClient();
-  const [patientsResult, appointmentsResult, progressResult, financesResult] =
-    await Promise.all([
-      supabase.from("patients").select("*"),
-      supabase
-        .from("appointments")
-        .select("*")
-        .order("appointment_date", { ascending: true })
-        .order("appointment_time", { ascending: true }),
-      supabase.from("patient_weekly_progress").select("*"),
-      supabase.from("appointment_finances").select("*"),
-    ]);
+  const role = await getCurrentRole();
+  const [patientsResult, appointmentsResult] = await Promise.all([
+    supabase.from("patients").select("*"),
+    supabase
+      .from("appointments")
+      .select("*")
+      .order("appointment_date", { ascending: true })
+      .order("appointment_time", { ascending: true }),
+  ]);
 
   throwIfError(patientsResult.error);
   throwIfError(appointmentsResult.error);
+
+  const [progressResult, financesResult] = role === "aplicacao"
+    ? [{ data: [], error: null }, { data: [], error: null }]
+    : await Promise.all([
+        supabase.from("patient_weekly_progress").select("*"),
+        supabase.from("appointment_finances").select("*"),
+      ]);
   throwIfError(progressResult.error);
   throwIfError(financesResult.error);
 
@@ -99,7 +120,7 @@ export async function listAppointments(): Promise<Agendamento[]> {
       nome: patient.full_name,
       telefone: patient.phone,
       email: patient.email,
-      foto: patient.photo_path ?? undefined,
+      foto: patient.photo_path?.startsWith("data:") ? undefined : patient.photo_path ?? undefined,
       data: appointment.appointment_date,
       horario: appointment.appointment_time.slice(0, 5),
       obs: appointment.notes,
