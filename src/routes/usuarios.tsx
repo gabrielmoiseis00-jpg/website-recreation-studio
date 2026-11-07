@@ -113,6 +113,20 @@ function Usuarios() {
           {myRole === "suporte" ? "Gerencie os usuários da Clínica Storbem." : "Cadastre usuários e configure os acessos da Secretária e da Aplicação."}
         </p>
       </div>
+      {myRole === "suporte" && <section className="space-y-3 rounded-xl border bg-card p-5">
+        <div>
+          <h2 className="font-semibold">Suas permissões — Suporte</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Sua conta possui acesso total ao sistema. Todas as áreas e operações estão liberadas automaticamente.</p>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2">
+          {areas.map((area) => <div key={area.key} className="rounded-lg border p-3">
+            <h3 className="font-medium">{area.label}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">{area.actions.map((action) => actionLabel[action]).join(" · ")}</p>
+            <span className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-green-700">✓ Acesso liberado</span>
+          </div>)}
+        </div>
+      </section>}
+
       <form onSubmit={submit} className="grid gap-3 rounded-xl border bg-card p-5 md:grid-cols-2">
         <h2 className="font-semibold md:col-span-2">Novo usuário</h2>
         <input className="input" required minLength={2} placeholder="Nome de usuário" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
