@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { getCurrentUser } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/client";
+import { uploadClinicLogo } from "@/lib/clinic-logo";
 import {
   createManagedUser, listManagedUsers, listManagedClinics, createManagedClinic, setManagedUserActive,
   getManagedUserPermissions, setManagedUserPermissions, getMyManagedPermissions, updateManagedUser, type UserPermissions,
@@ -48,6 +50,7 @@ function Usuarios() {
   const [clinics, setClinics] = useState<ManagedClinic[]>([]);
   const [selectedClinicId, setSelectedClinicId] = useState("");
   const [newClinic, setNewClinic] = useState<NewClinicForm>(emptyClinicForm);
+  const [newClinicLogo, setNewClinicLogo] = useState<File | null>(null);
   const [myRole, setMyRole] = useState<"suporte" | "medico" | null>(null);
   const [myUserId, setMyUserId] = useState("");
   const [myPermissions, setMyPermissions] = useState<UserPermissions>({});
@@ -108,13 +111,18 @@ function Usuarios() {
     try {
       const cnpjDigits = newClinic.cnpj.replace(/\D/g, "");
       if (cnpjDigits && cnpjDigits.length !== 14) throw new Error("Informe um CNPJ com 14 números ou deixe o campo vazio.");
-      if (newClinic.logo_url && !/^https:\/\//i.test(newClinic.logo_url.trim())) throw new Error("O logotipo deve usar um endereço HTTPS.");
-      const created = await createManagedClinic({ data: { ...newClinic, cnpj: cnpjDigits } });
+      const created = await createManagedClinic({ data: { ...newClinic, cnpj: cnpjDigits, logo_url: "" } });
+      if (newClinicLogo) {
+        const logoUrl = await uploadClinicLogo(newClinicLogo, (created as ManagedClinic).id);
+        const { error: logoError } = await createClient().from("clinics").update({ logo_url: logoUrl }).eq("id", (created as ManagedClinic).id);
+        if (logoError) throw new Error("Clínica criada, mas não foi possível salvar o logotipo: " + logoError.message);
+      }
       setClinics((current) => [...current, created as ManagedClinic].sort((a, b) => a.name.localeCompare(b.name)));
       setSelectedClinicId((created as ManagedClinic).id);
       window.localStorage.setItem("storbem-support-clinic-id", (created as ManagedClinic).id);
       window.dispatchEvent(new Event("storbem-clinics-updated"));
       setNewClinic(emptyClinicForm);
+      setNewClinicLogo(null);
       toast.success("Consultório cadastrado. Agora você pode vincular usuários a ele.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar o consultório.");
@@ -249,8 +257,9 @@ function Usuarios() {
           <label className="space-y-1 text-sm font-medium">Endereço
             <input className="input w-full" placeholder="Rua, número, bairro, cidade/UF" value={newClinic.address} onChange={(event) => setNewClinic({ ...newClinic, address: event.target.value })} />
           </label>
-          <label className="space-y-1 text-sm font-medium sm:col-span-2">Logotipo (URL HTTPS)
-            <input className="input w-full" type="url" placeholder="https://..." value={newClinic.logo_url} onChange={(event) => setNewClinic({ ...newClinic, logo_url: event.target.value })} />
+          <label className="space-y-1 text-sm font-medium sm:col-span-2">Logotipo da clínica
+            <input className="input w-full" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(event) => setNewClinicLogo(event.target.files?.[0] ?? null)} />
+            <span className="block text-xs font-normal text-muted-foreground">PNG, JPG, WEBP ou SVG — máximo de 2 MB. {newClinicLogo ? `Selecionado: ${newClinicLogo.name}` : "Escolha um arquivo do computador."}</span>
           </label>
           <button disabled={saving} className="btn-primary sm:col-span-2">{saving ? "Salvando..." : "Cadastrar clínica"}</button>
         </form>
