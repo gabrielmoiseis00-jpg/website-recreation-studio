@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as PacientesIndexRouteImport } from './routes/pacientes.index'
+import { Route as ProntuariosIndexRouteImport } from './routes/prontuarios.index'
 import { Route as UsuariosRouteImport } from './routes/usuarios'
 import { Route as AgendamentosIndexRouteImport } from './routes/agendamentos.index'
 import { Route as AgendamentosIdRouteImport } from './routes/agendamentos.$id'
@@ -27,6 +28,11 @@ const IndexRoute = IndexRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProntuariosIndexRoute = ProntuariosIndexRouteImport.update({
+  id: '/prontuarios/',
+  path: '/prontuarios/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PacientesIndexRoute = PacientesIndexRouteImport.update({
@@ -69,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/pacientes/': typeof PacientesIndexRoute
+  '/prontuarios/': typeof ProntuariosIndexRoute
   '/financeiro': typeof FinanceiroRoute
   '/usuarios': typeof UsuariosRoute
   '/agendamentos/$id': typeof AgendamentosIdRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/pacientes': typeof PacientesIndexRoute
+  '/prontuarios': typeof ProntuariosIndexRoute
   '/financeiro': typeof FinanceiroRoute
   '/usuarios': typeof UsuariosRoute
   '/agendamentos/$id': typeof AgendamentosIdRoute
@@ -105,6 +113,8 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/pacientes/'
+    | '/prontuarios/'
+    | '/prontuarios/'
     | '/financeiro'
     | '/usuarios'
     | '/agendamentos/$id'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/pacientes'
+    | '/prontuarios'
     | '/financeiro'
     | '/usuarios'
     | '/agendamentos/$id'
@@ -136,6 +147,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  ProntuariosIndexRoute: typeof ProntuariosIndexRoute
   DashboardRoute: typeof DashboardRoute
   PacientesIndexRoute: typeof PacientesIndexRoute
   IndexRoute: typeof IndexRoute
@@ -161,6 +173,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/prontuarios/': {
+      id: '/prontuarios/'
+      path: '/prontuarios'
+      fullPath: '/prontuarios/'
+      preLoaderRoute: typeof ProntuariosIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pacientes/': {
@@ -216,6 +235,7 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRouteChildren: RootRouteChildren = {
+  ProntuariosIndexRoute: ProntuariosIndexRoute,
   DashboardRoute: DashboardRoute,
   PacientesIndexRoute: PacientesIndexRoute,
   IndexRoute: IndexRoute,
