@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
-import { getPatientPhotoUrl, listPatients, removePatient, savePatient, type PatientRecord } from "@/lib/supabase/data";
+import { listPatients, removePatient, savePatient, type PatientRecord } from "@/lib/supabase/data";
 
 export const Route = createFileRoute("/pacientes/")({ component: Pacientes });
 
