@@ -4,6 +4,8 @@ import { lockOfflineVault, prepareOfflineVault, readOfflineRecord, saveOfflineRe
 
 let offlineUser: User | null = null;
 let offlineUserId: string | null = null;
+let vaultSessionUser: User | null = null;
+let vaultSessionUserId: string | null = null;
 
 type Profile = {
   username: string;
@@ -39,6 +41,8 @@ export async function login(email: string, password: string): Promise<User> {
     }
     offlineUser = cachedUser;
     offlineUserId = userId;
+    vaultSessionUser = cachedUser;
+    vaultSessionUserId = userId;
     return cachedUser;
   }
 
@@ -63,6 +67,15 @@ export async function login(email: string, password: string): Promise<User> {
     try {
       await prepareOfflineVault(normalizedEmail, authData.user.id, password);
       await saveOfflineRecord(authData.user.id, "profile", "current", user);
+      vaultSessionUser = user;
+      vaultSessionUserId = authData.user.id;
+      try {
+        const dataLayer = await import("@/lib/supabase/data");
+        const result = await dataLayer.syncOfflineChanges();
+        if (result.synced > 0) console.info(`Sincronização offline: ${result.synced} alteração(ões), ${result.pending} pendente(s).`);
+      } catch (syncError) {
+        console.warn("Há alterações offline aguardando sincronização.", syncError);
+      }
     } catch (vaultError) {
       // Online login must continue working if this browser cannot provide
       // secure local storage. Offline availability will remain disabled.
