@@ -209,7 +209,7 @@ function Usuarios() {
           </button>
         </div>
         <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
-          <option value="medico">Médico</option>
+          {myRole === "suporte" && <option value="medico">Médico</option>}
           <option value="secretaria">Secretária</option><option value="aplicacao">Aplicação</option>
         </select>
         <button disabled={saving || loading || !myRole} className="btn-primary md:col-span-2">{saving ? "Salvando..." : "Criar usuário"}</button>
