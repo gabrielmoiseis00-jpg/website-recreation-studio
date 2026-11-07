@@ -286,3 +286,61 @@ export const setManagedUserPermissions = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { success: true };
   });
+
+
+const deleteUserSchema = z.object({ userId: z.string().uuid() });
+export const deleteManagedUser = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => deleteUserSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { admin, profile, userId } = await getAdminContext();
+    if (data.userId === userId) throw new Error("Você não pode excluir sua própria conta.");
+    if (profile.role !== "suporte" && profile.permissions?.users?.delete !== true) {
+      throw new Error("Sua conta não tem permissão para excluir usuários.");
+    }
+
+    let query = admin.from("profiles").select("id, role, clinic_id").eq("id", data.userId);
+    if (profile.role !== "suporte") {
+      query = query.eq("clinic_id", profile.clinic_id).neq("role", "suporte");
+    }
+    const { data: target, error } = await query.maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!target || target.role === "suporte") throw new Error("Usuário não encontrado ou sem permissão para exclusão.");
+
+    const { error: deleteError } = await admin.auth.admin.deleteUser(target.id);
+    if (deleteError) throw new Error("Não foi possível excluir a conta: " + deleteError.message);
+    return { success: true };
+  });
+
+const deleteClinicSchema = z.object({ clinicId: z.string().uuid() });
+export const deleteManagedClinic = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => deleteClinicSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { admin, profile } = await getAdminContext();
+    if (profile.role !== "suporte") throw new Error("Somente Suporte pode excluir consultórios.");
+
+    const { data: clinic, error: clinicError } = await admin.from("clinics")
+      .select("id, name").eq("id", data.clinicId).maybeSingle();
+    if (clinicError) throw new Error(clinicError.message);
+    if (!clinic) throw new Error("Consultório não encontrado.");
+
+    const checks = await Promise.all([
+      admin.from("profiles").select("id", { count: "exact", head: true }).eq("clinic_id", data.clinicId),
+      admin.from("patients").select("id", { count: "exact", head: true }).eq("clinic_id", data.clinicId),
+      admin.from("appointments").select("id", { count: "exact", head: true }).eq("clinic_id", data.clinicId),
+      admin.from("patient_weekly_progress").select("id", { count: "exact", head: true }).eq("clinic_id", data.clinicId),
+      admin.from("appointment_finances").select("appointment_id", { count: "exact", head: true }).eq("clinic_id", data.clinicId),
+      admin.from("medical_records").select("id", { count: "exact", head: true }).eq("clinic_id", data.clinicId),
+    ]);
+    const failed = checks.find((result) => result.error);
+    if (failed?.error) throw new Error("Não foi possível verificar os dados vinculados: " + failed.error.message);
+    const labels = ["usuários", "pacientes", "agendamentos", "evoluções", "lançamentos financeiros", "prontuários"];
+    const occupied = checks.map((result, index) => ({ label: labels[index], count: result.count ?? 0 }))
+      .filter((item) => item.count > 0);
+    if (occupied.length) {
+      throw new Error("Este consultório ainda possui " + occupied.map((item) => item.count + " " + item.label).join(", ") + ". Remova ou transfira os dados necessários antes de excluir a clínica. Os registros clínicos não serão apagados automaticamente.");
+    }
+
+    const { error: deleteError } = await admin.from("clinics").delete().eq("id", data.clinicId);
+    if (deleteError) throw new Error("Não foi possível excluir o consultório: " + deleteError.message);
+    return { success: true, clinicName: clinic.name };
+  });
