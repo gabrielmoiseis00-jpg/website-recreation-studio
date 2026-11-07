@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@/lib/store";
+import { lockOfflineVault, prepareOfflineVault, readOfflineRecord, saveOfflineRecord, unlockOfflineVault } from "@/lib/offline-vault";
+
+let offlineUser: User | null = null;
+let offlineUserId: string | null = null;
 
 type Profile = {
   username: string;
@@ -21,9 +25,26 @@ function toUser(profile: Profile): User {
 }
 
 export async function login(email: string, password: string): Promise<User> {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // Offline access is allowed only when the browser explicitly reports no
+  // network. A server-side credential rejection must never fall back to an
+  // old locally cached password.
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    const userId = await unlockOfflineVault(normalizedEmail, password);
+    const cachedUser = await readOfflineRecord<User>(userId, "profile", "current");
+    if (!cachedUser) {
+      lockOfflineVault(userId);
+      throw new Error("Este dispositivo ainda não possui um perfil salvo para acesso offline. Entre online primeiro.");
+    }
+    offlineUser = cachedUser;
+    offlineUserId = userId;
+    return cachedUser;
+  }
+
   const supabase = createClient();
   const { error } = await supabase.auth.signInWithPassword({
-    email: email.trim(),
+    email: normalizedEmail,
     password,
   });
 
@@ -35,25 +56,20 @@ export async function login(email: string, password: string): Promise<User> {
     throw new Error("Usuário sem perfil ativo. Solicite ao administrador a liberação do acesso.");
   }
 
+  offlineUser = null;
+  offlineUserId = null;
+  const { data: authData } = await supabase.auth.getUser();
+  if (authData.user) {
+    try {
+      await prepareOfflineVault(normalizedEmail, authData.user.id, password);
+      await saveOfflineRecord(authData.user.id, "profile", "current", user);
+    } catch (vaultError) {
+      // Online login must continue working if this browser cannot provide
+      // secure local storage. Offline availability will remain disabled.
+      console.warn("Não foi possível preparar o acesso offline neste dispositivo.", vaultError);
+    }
+  }
+
   return user;
 }
 
-export async function getCurrentUser(): Promise<User | null> {
-  const supabase = createClient();
-  const { data: authData, error: authError } = await supabase.auth.getUser();
-  if (authError || !authData.user) return null;
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("username, role, active, clinic_id, permissions")
-    .eq("id", authData.user.id)
-    .maybeSingle();
-
-  if (error || !data || !data.active) return null;
-  return toUser(data as Profile);
-}
-
-export async function logout() {
-  const { error } = await createClient().auth.signOut();
-  if (error) throw error;
-}
