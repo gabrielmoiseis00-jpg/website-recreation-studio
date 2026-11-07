@@ -106,15 +106,15 @@ Foram adicionadas à branch de teste as páginas:
 
 ### Migrações adicionais obrigatórias
 
-Estas migrações novas ainda precisam ser executadas no SQL Editor do Supabase, **em ordem**, antes de testar as páginas correspondentes:
+As migrações de base e permissões até `20261106040000_user_permissions.sql` já foram aplicadas no projeto atual. Para a nova versão, execute as seguintes migrações no SQL Editor do Supabase, **em ordem**, antes de testar as páginas correspondentes:
 
-5. `20261107000000_medical_records.sql` — cria a tabela de prontuários e as políticas de acesso.
-6. `20261107010000_medical_records_patient_access.sql` — permite que profissionais com permissão de prontuário consultem os nomes dos pacientes vinculados.
-7. `20261107020000_reports_read_access.sql` — ajusta a leitura de consultas para Dashboard e Relatórios.
-8. `20261107030000_clinic_settings.sql` — adiciona telefone, endereço, fuso horário e duração padrão às configurações da clínica.
-9. `20261107040000_receipts_read_access.sql` — permite a leitura de metadados dos comprovantes por quem tem permissão de recibos.
+6. `20261107000000_medical_records.sql` — cria a tabela de prontuários e as políticas de acesso.
+7. `20261107010000_medical_records_patient_access.sql` — permite que profissionais com permissão de prontuário consultem os nomes dos pacientes vinculados.
+8. `20261107020000_reports_read_access.sql` — ajusta a leitura de consultas para Dashboard e Relatórios.
+9. `20261107030000_clinic_settings.sql` — adiciona telefone, endereço, fuso horário e duração padrão às configurações da clínica.
+10. `20261107040000_receipts_read_access.sql` — permite a leitura de metadados dos comprovantes por quem tem permissão de recibos.
 
-A sequência considera que as migrações anteriores até `20261106040000_user_permissions.sql` já foram executadas. Não pule etapas. Não execute novamente migrações antigas que já foram aplicadas.
+A numeração segue a ordem cronológica completa, incluindo as migrações anteriores. Não pule etapas. Não execute novamente migrações antigas que já foram aplicadas.
 
 ### Validação após as migrações
 
