@@ -39,6 +39,7 @@ async function getAdminContext() {
 export const getMyManagedPermissions = createServerFn({ method: "GET" }).handler(async () => {
   const { profile } = await getAdminContext();
   return {
+    userId: profile.id as string,
     role: profile.role as Role,
     permissions: (profile.permissions ?? {}) as UserPermissions,
   };
