@@ -72,7 +72,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
           {can("clinical_progress") && <Link to="/evolucao" className="nav-item" activeProps={{ className: "nav-item-active" }}><Activity className="h-4 w-4" /> Evolução</Link>}
           {can("medical_records") && <Link to="/prontuarios" className="nav-item" activeProps={{ className: "nav-item-active" }}><FileText className="h-4 w-4" /> Prontuários</Link>}
           {can("patients") && <Link to="/pacientes" className="nav-item" activeProps={{ className: "nav-item-active" }}><ContactRound className="h-4 w-4" /> Pacientes</Link>}
-          {can("receipts") && <Link to="/recibos" className="nav-item" activeProps={{ className: "nav-item-active" }}><ReceiptText className="h-4 w-4" /> Recibos</Link>}
+          {can("receipts") && can("finance") && <Link to="/recibos" className="nav-item" activeProps={{ className: "nav-item-active" }}><ReceiptText className="h-4 w-4" /> Recibos</Link>}
           {can("reports") && <Link to="/relatorios" className="nav-item" activeProps={{ className: "nav-item-active" }}><ChartNoAxesCombined className="h-4 w-4" /> Relatórios</Link>}
           {can("settings") && <Link to="/configuracoes" className="nav-item" activeProps={{ className: "nav-item-active" }}><Settings className="h-4 w-4" /> Configurações</Link>}
           {can("finance") && <Link to="/financeiro" className="nav-item" activeProps={{ className: "nav-item-active" }}>
