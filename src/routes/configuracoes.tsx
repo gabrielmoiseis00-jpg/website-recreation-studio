@@ -20,10 +20,14 @@ function Configuracoes(){
    if(user.papel!=="Suporte"&&user.permissions?.settings?.view!==true)throw new Error("Você não tem permissão para visualizar as configurações.");
    const supabase=createClient();
    let query=supabase.from("clinics").select("id,name,phone,address,timezone,appointment_duration_minutes");
-   if(user.clinicId)query=query.eq("id",user.clinicId);
-   const {data,error}=await query.limit(2);if(error)throw error;
-   if(!data?.length)throw new Error("Nenhuma clínica vinculada foi encontrada.");
-   if(!user.clinicId&&data.length!==1)throw new Error("Não foi possível identificar uma única clínica para o Suporte.");
+   if(user.clinicId) query=query.eq("id",user.clinicId);
+   else if(user.papel==="Suporte") {
+    const selected=window.localStorage.getItem("storbem-support-clinic-id");
+    if(!selected) throw new Error("Selecione um consultório no cabeçalho para editar as configurações.");
+    query=query.eq("id",selected);
+   }
+   const {data,error}=await query.limit(1);if(error)throw error;
+   if(!data?.length)throw new Error("Nenhuma clínica selecionada ou vinculada foi encontrada.");
    const row=data[0];if(active)setSettings({id:row.id,name:row.name,phone:row.phone??"",address:row.address??"",timezone:row.timezone??"America/Rio_Branco",appointment_duration_minutes:row.appointment_duration_minutes??30});
   }catch(error){toast.error(error instanceof Error?error.message:"Não foi possível carregar as configurações.");}
   finally{if(active)setLoading(false);}
