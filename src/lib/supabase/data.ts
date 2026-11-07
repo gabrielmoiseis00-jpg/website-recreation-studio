@@ -251,3 +251,55 @@ async function getCurrentClinicId(): Promise<string> {
   return data.clinic_id as string;
 }
 
+const RECEIPTS_BUCKET = "appointment-receipts";
+
+export async function uploadReceipt(appointmentId: string, file: File): Promise<string> {
+  const supabase = createClient();
+  const extension = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "file";
+  const clinicId = await getCurrentClinicId();
+  const path = `${clinicId}/${appointmentId}/${crypto.randomUUID()}.${extension}`;
+  const { error } = await supabase.storage
+    .from(RECEIPTS_BUCKET)
+    .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
+  throwIfError(error);
+  return path;
+}
+
+export async function getReceiptUrl(path: string): Promise<string> {
+  const { data, error } = await createClient().storage
+    .from(RECEIPTS_BUCKET)
+    .createSignedUrl(path, 60);
+  throwIfError(error);
+  return data.signedUrl;
+}
+
+export async function deleteReceipt(path: string): Promise<void> {
+  const { error } = await createClient().storage
+    .from(RECEIPTS_BUCKET)
+    .remove([path]);
+  throwIfError(error);
+}
+
+
+const PATIENT_PHOTOS_BUCKET = "patient-photos";
+
+export async function uploadPatientPhoto(file: File): Promise<string> {
+  const supabase = createClient();
+  await getCurrentRole();
+  const extension = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "jpg";
+  const clinicId = await getCurrentClinicId();
+  const path = `${clinicId}/${crypto.randomUUID()}.${extension}`;
+  const { error } = await supabase.storage
+    .from(PATIENT_PHOTOS_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false });
+  throwIfError(error);
+  return path;
+}
+
+export async function getPatientPhotoUrl(path: string): Promise<string> {
+  const { data, error } = await createClient().storage
+    .from(PATIENT_PHOTOS_BUCKET)
+    .createSignedUrl(path, 60);
+  throwIfError(error);
+  return data.signedUrl;
+}
