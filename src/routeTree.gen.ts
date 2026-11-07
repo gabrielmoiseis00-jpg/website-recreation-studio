@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as PacientesIndexRouteImport } from './routes/pacientes.index'
 import { Route as UsuariosRouteImport } from './routes/usuarios'
 import { Route as AgendamentosIndexRouteImport } from './routes/agendamentos.index'
 import { Route as AgendamentosIdRouteImport } from './routes/agendamentos.$id'
@@ -20,6 +22,16 @@ import { Route as AgendamentosEditarIdRouteImport } from './routes/agendamentos.
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PacientesIndexRoute = PacientesIndexRouteImport.update({
+  id: '/pacientes/',
+  path: '/pacientes/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FinanceiroRoute = FinanceiroRouteImport.update({
@@ -55,6 +67,10 @@ const AgendamentosEditarIdRoute = AgendamentosEditarIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/pacientes/': typeof PacientesIndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/pacientes': typeof PacientesIndexRoute
   '/financeiro': typeof FinanceiroRoute
   '/usuarios': typeof UsuariosRoute
   '/agendamentos/$id': typeof AgendamentosIdRoute
@@ -64,6 +80,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/pacientes': typeof PacientesIndexRoute
   '/financeiro': typeof FinanceiroRoute
   '/usuarios': typeof UsuariosRoute
   '/agendamentos/$id': typeof AgendamentosIdRoute
@@ -74,6 +92,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/pacientes/': typeof PacientesIndexRoute
   '/financeiro': typeof FinanceiroRoute
   '/usuarios': typeof UsuariosRoute
   '/agendamentos/$id': typeof AgendamentosIdRoute
@@ -85,6 +105,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/dashboard'
+    | '/pacientes/'
     | '/financeiro'
     | '/usuarios'
     | '/agendamentos/$id'
@@ -94,6 +116,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/dashboard'
+    | '/pacientes'
     | '/financeiro'
     | '/usuarios'
     | '/agendamentos/$id'
@@ -103,6 +127,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/dashboard'
+    | '/pacientes/'
     | '/financeiro'
     | '/usuarios'
     | '/agendamentos/$id'
@@ -112,6 +138,8 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  DashboardRoute: typeof DashboardRoute
+  PacientesIndexRoute: typeof PacientesIndexRoute
   IndexRoute: typeof IndexRoute
   FinanceiroRoute: typeof FinanceiroRoute
   UsuariosRoute: typeof UsuariosRoute
@@ -128,6 +156,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pacientes/': {
+      id: '/pacientes/'
+      path: '/pacientes'
+      fullPath: '/pacientes/'
+      preLoaderRoute: typeof PacientesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/financeiro': {
@@ -176,6 +218,8 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRouteChildren: RootRouteChildren = {
+  DashboardRoute: DashboardRoute,
+  PacientesIndexRoute: PacientesIndexRoute,
   IndexRoute: IndexRoute,
   FinanceiroRoute: FinanceiroRoute,
   UsuariosRoute: UsuariosRoute,
