@@ -78,7 +78,7 @@ function Usuarios() {
       ]);
       setUsers(managedUsers as ManagedUser[]);
       setClinics(managedClinics as ManagedClinic[]);
-      setSelectedClinicId((current) => current || (managedClinics[0]?.id ?? ""));
+      setSelectedClinicId((current) => current || (typeof window !== "undefined" ? window.localStorage.getItem("storbem-support-clinic-id") : null) || (managedClinics[0]?.id ?? ""));
       setMyUserId(ownAccess.userId);
       setMyPermissions(ownAccess.permissions);
     } catch (error) {
@@ -107,6 +107,7 @@ function Usuarios() {
       const created = await createManagedClinic({ data: { name: newClinicName } });
       setClinics((current) => [...current, created as ManagedClinic].sort((a, b) => a.name.localeCompare(b.name)));
       setSelectedClinicId((created as ManagedClinic).id);
+      window.localStorage.setItem("storbem-support-clinic-id", (created as ManagedClinic).id);
       setNewClinicName("");
       toast.success("Consultório cadastrado. Agora você pode vincular usuários a ele.");
     } catch (error) {
@@ -249,7 +250,10 @@ function Usuarios() {
           </button>
         </div>
         {myRole === "suporte" && <label className="space-y-1 text-sm font-medium md:col-span-2">Vincular usuário ao consultório
-          <select className="input w-full" required value={selectedClinicId} onChange={(event) => setSelectedClinicId(event.target.value)}>
+          <select className="input w-full" required value={selectedClinicId} onChange={(event) => {
+            setSelectedClinicId(event.target.value);
+            window.localStorage.setItem("storbem-support-clinic-id", event.target.value);
+          }}>
             <option value="">Selecione um consultório</option>
             {clinics.map((clinic) => <option key={clinic.id} value={clinic.id}>{clinic.name}</option>)}
           </select>
