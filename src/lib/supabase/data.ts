@@ -239,51 +239,15 @@ export async function removeAppointment(id: string): Promise<void> {
 }
 
 
-async function getCurrentClinicId(): Promise<string> {\n  const { data, error } = await createClient().from("profiles").select("clinic_id").single();\n  throwIfError(error);\n  if (!data?.clinic_id) throw new Error("Selecione um consultório antes de enviar arquivos.");\n  return data.clinic_id as string;\n}\n\nconst RECEIPTS_BUCKET = "appointment-receipts";\n\nexport async function uploadReceipt(appointmentId: string, file: File): Promise<string> {
+async function getCurrentClinicId(): Promise<string> {
   const supabase = createClient();
-  const extension = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "file";
-  const clinicId = await getCurrentClinicId();\n  const path = `${clinicId}/${appointmentId}/${crypto.randomUUID()}.${extension}`;
-  const { error } = await supabase.storage
-    .from(RECEIPTS_BUCKET)
-    .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  throwIfError(authError);
+  if (!auth.user) throw new Error("Sua sessão expirou. Entre novamente.");
+  const { data, error } = await supabase.from("profiles")
+    .select("clinic_id").eq("id", auth.user.id).single();
   throwIfError(error);
-  return path;
+  if (!data?.clinic_id) throw new Error("Esta conta precisa selecionar um consultório antes de enviar arquivos.");
+  return data.clinic_id as string;
 }
 
-export async function getReceiptUrl(path: string): Promise<string> {
-  const { data, error } = await createClient().storage
-    .from(RECEIPTS_BUCKET)
-    .createSignedUrl(path, 60);
-  throwIfError(error);
-  return data.signedUrl;
-}
-
-export async function deleteReceipt(path: string): Promise<void> {
-  const { error } = await createClient().storage
-    .from(RECEIPTS_BUCKET)
-    .remove([path]);
-  throwIfError(error);
-}
-
-
-const PATIENT_PHOTOS_BUCKET = "patient-photos";
-
-export async function uploadPatientPhoto(file: File): Promise<string> {
-  const supabase = createClient();
-  await getCurrentRole();
-  const extension = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "jpg";
-  const clinicId = await getCurrentClinicId();\n  const path = `${clinicId}/${crypto.randomUUID()}.${extension}`;
-  const { error } = await supabase.storage
-    .from(PATIENT_PHOTOS_BUCKET)
-    .upload(path, file, { contentType: file.type, upsert: false });
-  throwIfError(error);
-  return path;
-}
-
-export async function getPatientPhotoUrl(path: string): Promise<string> {
-  const { data, error } = await createClient().storage
-    .from(PATIENT_PHOTOS_BUCKET)
-    .createSignedUrl(path, 60);
-  throwIfError(error);
-  return data.signedUrl;
-}
