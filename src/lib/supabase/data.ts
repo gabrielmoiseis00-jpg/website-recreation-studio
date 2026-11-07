@@ -625,6 +625,10 @@ export async function syncOfflineChanges(): Promise<{ synced: number; pending: n
   if (!authData.user) throw new Error("Entre novamente online para sincronizar as alterações pendentes.");
   const userId = authData.user.id;
   const queue = await listOfflineQueue(userId);
+  const access = await getCurrentAccess();
+  if (access.role === "suporte" && queue.length > 0) {
+    throw new Error("A fila offline da conta de Suporte não pode ser enviada automaticamente para uma clínica selecionada. Revise essas alterações antes de continuar.");
+  }
   let synced = 0;
   for (const item of queue) {
     try {
