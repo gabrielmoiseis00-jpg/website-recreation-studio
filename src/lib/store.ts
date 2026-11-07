@@ -24,8 +24,8 @@ export type PagStatus = "pago" | "nao_pago" | "aguardando";
 export type Metodo = "" | "pix" | "dinheiro" | "credito" | "debito" | "boleto" | "convenio" | "transferencia";
 export const PAG_LABEL: Record<PagStatus, string> = { pago: "Pago", nao_pago: "Não pago", aguardando: "Aguardando" };
 export const METODO_LABEL: Record<Metodo, string> = { "": "—", pix: "Pix", dinheiro: "Dinheiro", credito: "Cartão de crédito", debito: "Cartão de débito", boleto: "Boleto", convenio: "Convênio", transferencia: "Transferência" };
-export const isAdmin = (u: User | null) => !!u && (u.papel === "Médico" || u.papel === "Secretária");
-export type User = { usuario: string; papel: "Médico" | "Secretária" | "Aplicação" };
+export const isAdmin = (u: User | null) => !!u && (u.papel === "Suporte" || u.papel === "Médico" || u.papel === "Secretária");
+export type User = { usuario: string; papel: "Suporte" | "Médico" | "Secretária" | "Aplicação"; clinicId?: string };
 
 export type Conta = { usuario: string; senha: string; papel: User["papel"] };
 const DEFAULT_USERS: Conta[] = [
