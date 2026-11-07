@@ -141,90 +141,67 @@ export async function getAppointment(id: string): Promise<Agendamento | undefine
 
 export async function upsertAppointment(appointment: Agendamento): Promise<void> {
   const supabase = createClient();
-
-  const { data: existingAppointment, error: existingAppointmentError } = await supabase
-    .from("appointments")
-    .select("patient_id")
-    .eq("id", appointment.id)
-    .maybeSingle();
+  const access = await getCurrentAccess();
+  const { data: existingAppointment, error: existingAppointmentError } = await supabase.from("appointments")
+    .select("patient_id").eq("id", appointment.id).maybeSingle();
   throwIfError(existingAppointmentError);
-
+  const appointmentExists = !!existingAppointment;
   let patientId = (existingAppointment as { patient_id: string } | null)?.patient_id;
+
   if (!patientId) {
-    const { data: matchingPatients, error: findPatientError } = await supabase
-      .from("patients")
-      .select("id")
-      .eq("email", appointment.email)
-      .limit(1);
+    const { data: matchingPatients, error: findPatientError } = await supabase.from("patients")
+      .select("id").eq("email", appointment.email).limit(1);
     throwIfError(findPatientError);
     patientId = (matchingPatients?.[0] as { id: string } | undefined)?.id;
   }
-  if (patientId) {
-    const { error } = await supabase
-      .from("patients")
-      .update({
-        full_name: appointment.nome,
-        phone: appointment.telefone,
-        email: appointment.email,
-        photo_path: appointment.foto && !appointment.foto.startsWith("data:") ? appointment.foto : null,
-      })
-      .eq("id", patientId);
+
+  if (patientId && can(access, "patients", "edit")) {
+    const { error } = await supabase.from("patients").update({
+      full_name: appointment.nome, phone: appointment.telefone, email: appointment.email,
+      photo_path: appointment.foto && !appointment.foto.startsWith("data:") ? appointment.foto : null,
+    }).eq("id", patientId);
     throwIfError(error);
-  } else {
-    const { data, error } = await supabase
-      .from("patients")
-      .insert({
-        full_name: appointment.nome,
-        phone: appointment.telefone,
-        email: appointment.email,
-        photo_path: appointment.foto && !appointment.foto.startsWith("data:") ? appointment.foto : null,
-      })
-      .select("id")
-      .single();
+  } else if (!patientId) {
+    if (!can(access, "patients", "create")) throw new Error("Você não tem permissão para cadastrar pacientes.");
+    const { data, error } = await supabase.from("patients").insert({
+      full_name: appointment.nome, phone: appointment.telefone, email: appointment.email,
+      photo_path: appointment.foto && !appointment.foto.startsWith("data:") ? appointment.foto : null,
+    }).select("id").single();
     throwIfError(error);
     patientId = (data as { id: string }).id;
   }
 
-  const { error: appointmentError } = await supabase.from("appointments").upsert({
-    id: appointment.id,
-    patient_id: patientId,
-    appointment_date: appointment.data,
-    appointment_time: appointment.horario,
-    notes: appointment.obs,
-    status: appointment.status,
-  });
-  throwIfError(appointmentError);
+  if (!patientId) throw new Error("Paciente não encontrado ou sem permissão para cadastrá-lo.");
+  const appointmentAction = appointmentExists ? "edit" : "create";
+  if (can(access, "appointments", appointmentAction)) {
+    const { error } = await supabase.from("appointments").upsert({
+      id: appointment.id, patient_id: patientId, appointment_date: appointment.data,
+      appointment_time: appointment.horario, notes: appointment.obs, status: appointment.status,
+    });
+    throwIfError(error);
+  } else if (!can(access, "finance", "edit") && !can(access, "finance", "create") &&
+             !can(access, "clinical_progress", "edit") && !can(access, "clinical_progress", "create")) {
+    throw new Error("Você não tem permissão para alterar este agendamento.");
+  }
 
-  const access = await getCurrentAccess();
-  const progressRows = (can(access, "clinical_progress", "edit") || can(access, "clinical_progress", "create")) ? (appointment.semanas ?? []).slice(0, 4).map((week, index) => ({
-    appointment_id: appointment.id,
-    week_number: index + 1,
-    medications: week.meds,
-    observations: week.obs,
-  })) : [];
+  const progressRows = (can(access, "clinical_progress", "edit") || can(access, "clinical_progress", "create"))
+    ? (appointment.semanas ?? []).slice(0, 4).map((week, index) => ({
+        appointment_id: appointment.id, week_number: index + 1, medications: week.meds, observations: week.obs,
+      })) : [];
   if (progressRows.length) {
-    const { error } = await supabase
-      .from("patient_weekly_progress")
-      .upsert(progressRows, { onConflict: "appointment_id,week_number" });
+    const { error } = await supabase.from("patient_weekly_progress").upsert(progressRows, { onConflict: "appointment_id,week_number" });
     throwIfError(error);
   }
 
   const hasFinance = (can(access, "finance", "edit") || can(access, "finance", "create")) && (
-    appointment.valor !== undefined ||
-    appointment.pagStatus !== undefined ||
-    appointment.metodo !== undefined ||
-    appointment.pagData !== undefined ||
-    appointment.comprovante !== undefined
+    appointment.valor !== undefined || appointment.pagStatus !== undefined || appointment.metodo !== undefined ||
+    appointment.pagData !== undefined || appointment.comprovante !== undefined
   );
-
   if (hasFinance) {
     const { error } = await supabase.from("appointment_finances").upsert({
-      appointment_id: appointment.id,
-      amount: appointment.valor ?? 0,
-      payment_status: appointment.pagStatus ?? "aguardando",
-      payment_method: appointment.metodo ?? "",
-      payment_date: appointment.pagData || null,
-      receipt_path: appointment.comprovante ?? null,
+      appointment_id: appointment.id, amount: appointment.valor ?? 0,
+      payment_status: appointment.pagStatus ?? "aguardando", payment_method: appointment.metodo ?? "",
+      payment_date: appointment.pagData || null, receipt_path: appointment.comprovante ?? null,
       receipt_name: appointment.comprovanteNome ?? null,
     });
     throwIfError(error);
