@@ -113,25 +113,29 @@ export async function listAppointments(): Promise<Agendamento[]> {
         session.user.permissions?.finance?.view !== true) {
       throw new Error("Você não tem permissão para visualizar consultas, evoluções ou financeiro.");
     }
-    return (await listOfflineRecords<Agendamento>(session.userId, "appointments")).map((item) => item.value);
+    return (await listOfflineRecords<Agendamento>(session.userId, "appointments"))
+      .map((item) => item.value)
+      .sort((a, b) => a.data.localeCompare(b.data) || a.horario.localeCompare(b.horario));
   }
+
   const supabase = createClient();
   const access = await getCurrentAccess();
   const [patientsResult, appointmentsResult] = await Promise.all([
     supabase.from("patients").select("*"),
-    supabase
-      .from("appointments")
-      .select("*")
+    supabase.from("appointments").select("*")
       .order("appointment_date", { ascending: true })
       .order("appointment_time", { ascending: true }),
   ]);
-
   throwIfError(patientsResult.error);
   throwIfError(appointmentsResult.error);
 
   const [progressResult, financesResult] = await Promise.all([
-    can(access, "clinical_progress", "view") ? supabase.from("patient_weekly_progress").select("*") : Promise.resolve({ data: [], error: null }),
-    can(access, "finance", "view") ? supabase.from("appointment_finances").select("*") : Promise.resolve({ data: [], error: null }),
+    can(access, "clinical_progress", "view")
+      ? supabase.from("patient_weekly_progress").select("*")
+      : Promise.resolve({ data: [], error: null }),
+    can(access, "finance", "view")
+      ? supabase.from("appointment_finances").select("*")
+      : Promise.resolve({ data: [], error: null }),
   ]);
   throwIfError(progressResult.error);
   throwIfError(financesResult.error);
@@ -140,78 +144,71 @@ export async function listAppointments(): Promise<Agendamento[]> {
   const appointments = (appointmentsResult.data ?? []) as unknown as AppointmentRow[];
   const progress = (progressResult.data ?? []) as unknown as ProgressRow[];
   const finances = (financesResult.data ?? []) as unknown as FinanceRow[];
-
   const patientById = new Map(patients.map((patient) => [patient.id, patient]));
   const progressByAppointment = new Map<string, ProgressRow[]>();
   for (const row of progress) {
-    const current = progressByAppointment.get(row.appointment_id) ?? [];
-    current.push(row);
-    progressByAppointment.set(row.appointment_id, current);
+    const rows = progressByAppointment.get(row.appointment_id) ?? [];
+    rows.push(row);
+    progressByAppointment.set(row.appointment_id, rows);
   }
   const financeByAppointment = new Map(finances.map((row) => [row.appointment_id, row]));
 
-  const mapped = appointments.flatMap((appointment) => {
+  const mapped: Agendamento[] = appointments.flatMap((appointment) => {
     const patient = patientById.get(appointment.patient_id);
     if (!patient) return [];
     const finance = financeByAppointment.get(appointment.id);
     return [{
-      id: appointment.id,
-      nome: patient.full_name,
-      telefone: patient.phone,
-      email: patient.email,
-      foto: patient.photo_path ?? undefined,
-      data: appointment.appointment_date,
-      horario: appointment.appointment_time.slice(0, 5),
-      obs: appointment.notes,
-      status: appointment.status,
-      semanas: mapWeeks(progressByAppointment.get(appointment.id) ?? []),
-      valor: finance ? Number(finance.amount) : undefined,
-      pagStatus: finance?.payment_status,
-      metodo: finance?.payment_method,
-      comprovante: finance?.receipt_path ?? undefined,
-      comprovanteNome: finance?.receipt_name ?? undefined,
-      pagData: finance?.payment_date ?? undefined,
+      id: appointment.id, nome: patient.full_name, telefone: patient.phone, email: patient.email,
+      foto: patient.photo_path ?? undefined, data: appointment.appointment_date,
+      horario: appointment.appointment_time.slice(0, 5), obs: appointment.notes,
+      status: appointment.status, semanas: mapWeeks(progressByAppointment.get(appointment.id) ?? []),
+      valor: finance ? Number(finance.amount) : undefined, pagStatus: finance?.payment_status,
+      metodo: finance?.payment_method, comprovante: finance?.receipt_path ?? undefined,
+      comprovanteNome: finance?.receipt_name ?? undefined, pagData: finance?.payment_date ?? undefined,
     }];
   });
-  const session = getOfflineSessionInfo();
-  if (session) {
-    const currentPatientIds = new Set(patients.map((patient) => patient.id));
-    const pendingPatients = await pendingEntityChanges(session.userId, "patient");
-    const cachedPatients = await listOfflineRecords<PatientRecord>(session.userId, "patients");
-    for (const cached of cachedPatients) {
-      if (pendingPatients.deletes.has(cached.id) ||
-          (!currentPatientIds.has(cached.id) && !pendingPatients.upserts.has(cached.id))) {
-        await deleteOfflineRecord(session.userId, "patients", cached.id);
-      }
-    }
-    for (const patient of patients) {
-      if (pendingPatients.upserts.has(patient.id) || pendingPatients.deletes.has(patient.id)) continue;
-      await saveOfflineRecord(session.userId, "patients", patient.id, { id: patient.id, nome: patient.full_name, telefone: patient.phone, email: patient.email, foto: patient.photo_path ?? undefined, criadoEm: new Date().toISOString() });
-    }
-    const currentAppointmentIds = new Set(mapped.map((appointment) => appointment.id));
-    const pendingAppointments = await pendingEntityChanges(session.userId, "appointment");
-    const cachedAppointments = await listOfflineRecords<Agendamento>(session.userId, "appointments");
-    for (const cached of cachedAppointments) {
-      if (pendingAppointments.deletes.has(cached.id) ||
-          (!currentAppointmentIds.has(cached.id) && !pendingAppointments.upserts.has(cached.id))) {
-        await deleteOfflineRecord(session.userId, "appointments", cached.id);
-      }
-    }
-    for (const appointment of mapped) {
-      if (pendingAppointments.upserts.has(appointment.id) || pendingAppointments.deletes.has(appointment.id)) continue;
-      await saveOfflineRecord(session.userId, "appointments", appointment.id, appointment);
-    }
-  }
-    const localPending = await listOfflineRecords<Agendamento>(session.userId, "appointments");
-    const pendingById = new Map(localPending.filter((item) => pendingAppointments.upserts.has(item.id)).map((item) => [item.id, item.value]));
-    const merged = new Map(mapped.map((appointment) => [appointment.id, appointment]));
-    for (const id of pendingAppointments.deletes) merged.delete(id);
-    for (const [id, appointment] of pendingById) merged.set(id, appointment);
-    return [...merged.values()].sort((a, b) => a.data.localeCompare(b.data) || a.horario.localeCompare(b.horario));
-  }
-  return mapped;
-}
 
+  const session = getOfflineSessionInfo();
+  if (!session) return mapped;
+  const pendingPatients = await pendingEntityChanges(session.userId, "patient");
+  const cachedPatients = await listOfflineRecords<PatientRecord>(session.userId, "patients");
+  const remotePatientIds = new Set(patients.map((patient) => patient.id));
+  for (const cached of cachedPatients) {
+    if (pendingPatients.deletes.has(cached.id) ||
+        (!remotePatientIds.has(cached.id) && !pendingPatients.upserts.has(cached.id))) {
+      await deleteOfflineRecord(session.userId, "patients", cached.id);
+    }
+  }
+  for (const patient of patients) {
+    if (pendingPatients.upserts.has(patient.id) || pendingPatients.deletes.has(patient.id)) continue;
+    await saveOfflineRecord(session.userId, "patients", patient.id, {
+      id: patient.id, nome: patient.full_name, telefone: patient.phone, email: patient.email,
+      foto: patient.photo_path ?? undefined, criadoEm: new Date().toISOString(),
+    });
+  }
+
+  const pendingAppointments = await pendingEntityChanges(session.userId, "appointment");
+  const cachedAppointments = await listOfflineRecords<Agendamento>(session.userId, "appointments");
+  const remoteAppointmentIds = new Set(mapped.map((appointment) => appointment.id));
+  for (const cached of cachedAppointments) {
+    if (pendingAppointments.deletes.has(cached.id) ||
+        (!remoteAppointmentIds.has(cached.id) && !pendingAppointments.upserts.has(cached.id))) {
+      await deleteOfflineRecord(session.userId, "appointments", cached.id);
+    }
+  }
+  for (const appointment of mapped) {
+    if (pendingAppointments.upserts.has(appointment.id) || pendingAppointments.deletes.has(appointment.id)) continue;
+    await saveOfflineRecord(session.userId, "appointments", appointment.id, appointment);
+  }
+  const localPending = await listOfflineRecords<Agendamento>(session.userId, "appointments");
+  const pendingById = new Map(localPending
+    .filter((item) => pendingAppointments.upserts.has(item.id))
+    .map((item) => [item.id, item.value]));
+  const merged = new Map(mapped.map((appointment) => [appointment.id, appointment]));
+  for (const id of pendingAppointments.deletes) merged.delete(id);
+  for (const [id, appointment] of pendingById) merged.set(id, appointment);
+  return [...merged.values()].sort((a, b) => a.data.localeCompare(b.data) || a.horario.localeCompare(b.horario));
+}
 export async function getAppointment(id: string): Promise<Agendamento | undefined> {
   const appointments = await listAppointments();
   return appointments.find((appointment) => appointment.id === id);
@@ -501,50 +498,52 @@ export type PatientRecord = {
 export async function listPatients(): Promise<PatientRecord[]> {
   if (isOffline()) {
     const session = await offlineContext();
-    if (session.user.papel !== "Suporte" && session.user.permissions?.patients?.view !== true && session.user.permissions?.medical_records?.view !== true) throw new Error("Você não tem permissão para visualizar pacientes.");
-    return (await listOfflineRecords<PatientRecord>(session.userId, "patients")).map((item) => item.value).sort((a, b) => a.nome.localeCompare(b.nome));
+    if (session.user.papel !== "Suporte" && session.user.permissions?.patients?.view !== true && session.user.permissions?.medical_records?.view !== true) {
+      throw new Error("Você não tem permissão para visualizar pacientes.");
+    }
+    return (await listOfflineRecords<PatientRecord>(session.userId, "patients"))
+      .map((item) => item.value)
+      .sort((a, b) => a.nome.localeCompare(b.nome));
   }
+
   const supabase = createClient();
   const access = await getCurrentAccess();
-  if (!can(access, "patients", "view") && !can(access, "medical_records", "view")) throw new Error("Você não tem permissão para visualizar pacientes.");
-  const { data, error } = await supabase
-    .from("patients")
+  if (!can(access, "patients", "view") && !can(access, "medical_records", "view")) {
+    throw new Error("Você não tem permissão para visualizar pacientes.");
+  }
+  const { data, error } = await supabase.from("patients")
     .select("id, full_name, phone, email, photo_path, created_at")
     .order("full_name", { ascending: true });
   throwIfError(error);
-  const patients = (data ?? []).map((row) => ({
-    id: row.id as string,
-    nome: row.full_name as string,
-    telefone: row.phone as string,
-    email: row.email as string,
-    foto: (row.photo_path as string | null) ?? undefined,
+  const patients: PatientRecord[] = (data ?? []).map((row) => ({
+    id: row.id as string, nome: row.full_name as string, telefone: row.phone as string,
+    email: row.email as string, foto: (row.photo_path as string | null) ?? undefined,
     criadoEm: row.created_at as string,
   }));
-  const session = getOfflineSessionInfo();
-  if (session) {
-    const currentIds = new Set(patients.map((patient) => patient.id));
-    const pending = await pendingEntityChanges(session.userId, "patient");
-    const cached = await listOfflineRecords<PatientRecord>(session.userId, "patients");
-    for (const item of cached) {
-      if (!currentIds.has(item.id) && !pending.upserts.has(item.id)) {
-        await deleteOfflineRecord(session.userId, "patients", item.id);
-      }
-    }
-    for (const patient of patients) {
-      if (pending.upserts.has(patient.id) || pending.deletes.has(patient.id)) continue;
-      await saveOfflineRecord(session.userId, "patients", patient.id, patient);
-    }
-  }
-    const localPending = await listOfflineRecords<PatientRecord>(session.userId, "patients");
-    const pendingById = new Map(localPending.filter((item) => pending.upserts.has(item.id)).map((item) => [item.id, item.value]));
-    const merged = new Map(patients.map((patient) => [patient.id, patient]));
-    for (const id of pending.deletes) merged.delete(id);
-    for (const [id, patient] of pendingById) merged.set(id, patient);
-    return [...merged.values()].sort((a, b) => a.nome.localeCompare(b.nome));
-  }
-  return patients;
-}
 
+  const session = getOfflineSessionInfo();
+  if (!session) return patients;
+  const pending = await pendingEntityChanges(session.userId, "patient");
+  const remoteIds = new Set(patients.map((patient) => patient.id));
+  const cached = await listOfflineRecords<PatientRecord>(session.userId, "patients");
+  for (const item of cached) {
+    if (pending.deletes.has(item.id) || (!remoteIds.has(item.id) && !pending.upserts.has(item.id))) {
+      await deleteOfflineRecord(session.userId, "patients", item.id);
+    }
+  }
+  for (const patient of patients) {
+    if (pending.upserts.has(patient.id) || pending.deletes.has(patient.id)) continue;
+    await saveOfflineRecord(session.userId, "patients", patient.id, patient);
+  }
+  const localPending = await listOfflineRecords<PatientRecord>(session.userId, "patients");
+  const pendingById = new Map(localPending
+    .filter((item) => pending.upserts.has(item.id))
+    .map((item) => [item.id, item.value]));
+  const merged = new Map(patients.map((patient) => [patient.id, patient]));
+  for (const id of pending.deletes) merged.delete(id);
+  for (const [id, patient] of pendingById) merged.set(id, patient);
+  return [...merged.values()].sort((a, b) => a.nome.localeCompare(b.nome));
+}
 export async function savePatient(patient: Omit<PatientRecord, "criadoEm"> & { __offlineNew?: boolean }): Promise<void> {
   if (isOffline()) {
     const session = await offlineContext();
