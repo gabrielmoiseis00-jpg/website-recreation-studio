@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { CalendarDays, List, Plus, LogOut, Wallet, Users, Moon, Sun, Palette, LayoutDashboard, ContactRound, FileText, ChartNoAxesCombined, Settings, ReceiptText, Activity } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { getCurrentUser, hasOfflineSession, logout } from "@/lib/auth";
+import { listManagedClinics } from "@/lib/admin";
 import { type User } from "@/lib/store";
 import { CORES, getTheme, setTheme, type Theme } from "@/lib/theme";
 
@@ -10,6 +11,8 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
   const [user, setUser] = useState<User | null>(null);
   const [theme, setT] = useState<Theme>({ dark: false, hue: 262 });
   const [paleta, setPaleta] = useState(false);
+  const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
+  const [selectedClinicId, setSelectedClinicId] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -25,6 +28,20 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
         nav({ to: "/agendamentos" });
       } else {
         setUser(current);
+        if (current.papel === "Suporte" && !hasOfflineSession()) {
+          try {
+            const available = await listManagedClinics();
+            if (!active) return;
+            setClinics(available as { id: string; name: string }[]);
+            const stored = window.localStorage.getItem("storbem-support-clinic-id") || "";
+            const validStored = available.some((clinic) => clinic.id === stored);
+            const next = validStored ? stored : (available[0]?.id ?? "");
+            setSelectedClinicId(next);
+            if (next) window.localStorage.setItem("storbem-support-clinic-id", next);
+          } catch (error) {
+            console.warn("Não foi possível carregar a lista de consultórios.", error);
+          }
+        }
       }
     };
 
@@ -88,6 +105,17 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
         <header className="flex items-center justify-between border-b bg-card px-6 py-4">
           <span className="font-semibold">Sistema de Agendamentos</span>
           <div className="flex items-center gap-2">
+            {user.papel === "Suporte" && clinics.length > 0 && <label className="hidden items-center gap-2 text-xs sm:flex">
+              <span className="text-muted-foreground">Consultório</span>
+              <select aria-label="Consultório ativo" className="input max-w-48 py-1 text-xs" value={selectedClinicId} onChange={(event) => {
+                const value = event.target.value;
+                setSelectedClinicId(value);
+                window.localStorage.setItem("storbem-support-clinic-id", value);
+                window.location.reload();
+              }}>
+                {clinics.map((clinic) => <option key={clinic.id} value={clinic.id}>{clinic.name}</option>)}
+              </select>
+            </label>}
             <div className="relative">
               <button aria-label="Cor do site" onClick={() => setPaleta(!paleta)} className="rounded-md p-2 text-muted-foreground hover:bg-accent">
                 <Palette className="h-4 w-4" />
