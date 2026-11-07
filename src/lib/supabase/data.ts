@@ -195,7 +195,7 @@ export async function upsertAppointment(appointment: Agendamento): Promise<void>
   });
   throwIfError(appointmentError);
 
-  const role = await getCurrentRole();
+  const access = await getCurrentAccess();
   const progressRows = (can(access, "clinical_progress", "edit") || can(access, "clinical_progress", "create")) ? (appointment.semanas ?? []).slice(0, 4).map((week, index) => ({
     appointment_id: appointment.id,
     week_number: index + 1,
