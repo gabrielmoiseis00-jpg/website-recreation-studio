@@ -43,11 +43,13 @@ export const listManagedUsers = createServerFn({ method: "GET" }).handler(async 
   const { data: profiles, error } = await query.order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
 
-  const { data: authUsers, error: usersError } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (usersError) throw new Error(usersError.message);
-  const { data: clinics, error: clinicsError } = await admin.from("clinics").select("id, name");
-  if (clinicsError) throw new Error(clinicsError.message);
-  const emailById = new Map(authUsers.users.map((user) => [user.id, user.email ?? ""]));
+  // Dados auxiliares não podem impedir a lista de usuários de aparecer.
+  // A consulta principal de profiles é suficiente para exibir e administrar os acessos.
+  const [{ data: authUsers }, { data: clinics }] = await Promise.all([
+    admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+    admin.from("clinics").select("id, name"),
+  ]);
+  const emailById = new Map((authUsers?.users ?? []).map((user) => [user.id, user.email ?? ""]));
   const clinicNameById = new Map((clinics ?? []).map((clinic) => [clinic.id, clinic.name]));
   return (profiles ?? []).map((item) => ({
     id: item.id,
