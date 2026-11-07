@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CalendarDays, List, Plus, LogOut, Wallet, Users, Moon, Sun, Palette, LayoutDashboard, ContactRound, FileText, ChartNoAxesCombined, Settings, ReceiptText, Activity } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { getCurrentUser, logout } from "@/lib/auth";
+import { getCurrentUser, hasOfflineSession, logout } from "@/lib/auth";
 import { type User } from "@/lib/store";
 import { CORES, getTheme, setTheme, type Theme } from "@/lib/theme";
 
