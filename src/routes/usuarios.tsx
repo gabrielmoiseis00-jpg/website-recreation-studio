@@ -108,6 +108,7 @@ function Usuarios() {
       setClinics((current) => [...current, created as ManagedClinic].sort((a, b) => a.name.localeCompare(b.name)));
       setSelectedClinicId((created as ManagedClinic).id);
       window.localStorage.setItem("storbem-support-clinic-id", (created as ManagedClinic).id);
+      window.dispatchEvent(new Event("storbem-clinics-updated"));
       setNewClinicName("");
       toast.success("Consultório cadastrado. Agora você pode vincular usuários a ele.");
     } catch (error) {
@@ -253,6 +254,7 @@ function Usuarios() {
           <select className="input w-full" required value={selectedClinicId} onChange={(event) => {
             setSelectedClinicId(event.target.value);
             window.localStorage.setItem("storbem-support-clinic-id", event.target.value);
+            window.dispatchEvent(new Event("storbem-clinics-updated"));
           }}>
             <option value="">Selecione um consultório</option>
             {clinics.map((clinic) => <option key={clinic.id} value={clinic.id}>{clinic.name}</option>)}
