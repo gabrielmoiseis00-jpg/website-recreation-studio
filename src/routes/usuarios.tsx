@@ -180,7 +180,7 @@ function Usuarios() {
           <p className="mt-1 text-sm text-muted-foreground">
             {myRole === "suporte"
               ? "Sua conta possui acesso total ao sistema."
-              : "Sua conta de Médico tem acesso administrativo completo à clínica e pode configurar todas as permissões da Secretária e da Aplicação."}
+              : "Sua conta de Médico tem acesso administrativo completo à clínica e pode cadastrar e gerenciar outros médicos, secretárias e usuários de aplicação."}
           </p>
         </div>
         <div className="grid gap-2 md:grid-cols-2">
@@ -209,7 +209,7 @@ function Usuarios() {
           </button>
         </div>
         <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
-          {myRole === "suporte" && <option value="medico">Médico</option>}
+          <option value="medico">Médico</option>
           <option value="secretaria">Secretária</option><option value="aplicacao">Aplicação</option>
         </select>
         <button disabled={saving || loading || !myRole} className="btn-primary md:col-span-2">{saving ? "Salvando..." : "Criar usuário"}</button>
