@@ -14,6 +14,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
   const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
   const [selectedClinicId, setSelectedClinicId] = useState("");
   const [clinicDisplayName, setClinicDisplayName] = useState("Clínica");
+  const [clinicLogoUrl, setClinicLogoUrl] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -30,8 +31,8 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
       } else {
         setUser(current);
         if (current.papel !== "Suporte" && current.clinicId) {
-          void import("@/lib/supabase/client").then(({ createClient }) => createClient().from("clinics").select("name").eq("id", current.clinicId!).maybeSingle()).then(({ data }) => {
-            if (active && data?.name) setClinicDisplayName(data.name);
+          void import("@/lib/supabase/client").then(({ createClient }) => createClient().from("clinics").select("name,logo_url").eq("id", current.clinicId!).maybeSingle()).then(({ data }) => {
+            if (active && data?.name) { setClinicDisplayName(data.name); setClinicLogoUrl(data.logo_url ?? ""); }
           }).catch((error) => console.warn("Não foi possível carregar a identidade da clínica.", error));
         }
         if (current.papel === "Suporte" && !hasOfflineSession()) {
@@ -39,8 +40,13 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
             const available = await listManagedClinics();
             if (!active) return;
             setClinics(available as { id: string; name: string }[]);
-            const selectedClinic = available.find((clinic) => clinic.id === (window.localStorage.getItem("storbem-support-clinic-id") || ""));
-            if (selectedClinic) setClinicDisplayName(selectedClinic.name);
+            const selectedClinicId = window.localStorage.getItem("storbem-support-clinic-id") || "";
+            const selectedClinic = available.find((clinic) => clinic.id === selectedClinicId);
+            if (selectedClinic) {
+              setClinicDisplayName(selectedClinic.name);
+              const { data: profileData } = await (await import("@/lib/supabase/client")).createClient().from("clinics").select("logo_url").eq("id", selectedClinicId).maybeSingle();
+              if (active) setClinicLogoUrl(profileData?.logo_url ?? "");
+            }
             const stored = window.localStorage.getItem("storbem-support-clinic-id") || "";
             const validStored = available.some((clinic) => clinic.id === stored);
             const next = validStored ? stored : (available[0]?.id ?? "");
@@ -97,7 +103,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
     <div className="flex min-h-screen bg-muted">
       <aside className="hidden w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
         <div className="flex items-center gap-2 px-5 py-6 text-lg font-semibold">
-          <CalendarDays className="h-5 w-5" /> <span className="truncate">{clinicDisplayName}</span>
+          {clinicLogoUrl ? <img src={clinicLogoUrl} alt={`Logotipo ${clinicDisplayName}`} className="h-9 w-9 rounded-md object-contain bg-white" /> : <CalendarDays className="h-5 w-5" />} <span className="truncate">{clinicDisplayName}</span>
         </div>
         <nav className="flex flex-col gap-1 px-3 text-sm">
           {can("dashboard") && <Link to="/dashboard" className="nav-item" activeProps={{ className: "nav-item-active" }}><LayoutDashboard className="h-4 w-4" /> Painel inicial</Link>}
@@ -133,6 +139,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
                 const value = event.target.value;
                 setSelectedClinicId(value);
                 setClinicDisplayName(clinics.find((clinic) => clinic.id === value)?.name ?? "Clínica");
+                setClinicLogoUrl("");
                 window.localStorage.setItem("storbem-support-clinic-id", value);
                 window.location.reload();
               }}>
@@ -170,7 +177,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
           </div>
         </header>
         <main className="flex-1 p-6">{children}</main>
-        <footer className="pb-4 text-center text-xs text-muted-foreground">Storbem © 2026</footer>
+        <footer className="pb-4 text-center text-xs text-muted-foreground">{clinicDisplayName} © {new Date().getFullYear()}</footer>
       </div>
     </div>
   );
