@@ -43,6 +43,7 @@ export const Route = createFileRoute("/usuarios")({
 function Usuarios() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [myRole, setMyRole] = useState<"suporte" | "medico" | null>(null);
+  const [myUserId, setMyUserId] = useState("");
   const [myPermissions, setMyPermissions] = useState<UserPermissions>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -64,6 +65,7 @@ function Usuarios() {
       setMyRole(role);
       const [managedUsers, ownAccess] = await Promise.all([listManagedUsers(), getMyManagedPermissions()]);
       setUsers(managedUsers as ManagedUser[]);
+      setMyUserId(ownAccess.userId);
       setMyPermissions(ownAccess.permissions);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Não foi possível carregar os usuários.";
@@ -193,8 +195,8 @@ function Usuarios() {
               </td>
               <td className="p-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  {user.role !== "suporte" && (myRole === "suporte" || user.role === "secretaria" || user.role === "aplicacao") && <button type="button" className="btn-ghost border px-3 py-2" onClick={() => void openPermissions(user)}>Configurar permissões</button>}
-                  {user.role !== "suporte" && <button type="button" className={user.active ? "rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50" : "rounded-lg border border-green-300 px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-50"} onClick={() => void toggleActive(user)}>
+                  {user.id !== myUserId && user.role !== "suporte" && (myRole === "suporte" || user.role === "secretaria" || user.role === "aplicacao") && <button type="button" className="btn-ghost border px-3 py-2" onClick={() => void openPermissions(user)}>Configurar permissões</button>}
+                  {user.id !== myUserId && user.role !== "suporte" && <button type="button" className={user.active ? "rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50" : "rounded-lg border border-green-300 px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-50"} onClick={() => void toggleActive(user)}>
                     {user.active ? "Bloquear acesso" : "Ativar usuário"}
                   </button>}
                 </div>
