@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { getOfflineSessionInfo } from "@/lib/auth";
-import { enqueueOfflineChange, listOfflineRecords, listOfflineQueue, removeOfflineQueueItem, deleteOfflineRecord, saveOfflineRecord, updateOfflineQueueItem } from "@/lib/offline-vault";
+import { enqueueOfflineChange, listOfflineRecords, listOfflineQueue, removeOfflineQueueItem, deleteOfflineRecord, readOfflineRecord, saveOfflineRecord, updateOfflineQueueItem } from "@/lib/offline-vault";
 import {
   emptySemanas,
   type Agendamento,
@@ -146,7 +146,10 @@ export async function listAppointments(): Promise<Agendamento[]> {
     }];
   });
   const session = getOfflineSessionInfo();
-  if (session) for (const appointment of mapped) await saveOfflineRecord(session.userId, "appointments", appointment.id, appointment);
+  if (session) {
+    for (const patient of patients) await saveOfflineRecord(session.userId, "patients", patient.id, { id: patient.id, nome: patient.full_name, telefone: patient.phone, email: patient.email, foto: patient.photo_path ?? undefined, criadoEm: new Date().toISOString() });
+    for (const appointment of mapped) await saveOfflineRecord(session.userId, "appointments", appointment.id, appointment);
+  }
   return mapped;
 }
 
@@ -158,7 +161,9 @@ export async function getAppointment(id: string): Promise<Agendamento | undefine
 export async function upsertAppointment(appointment: Agendamento): Promise<void> {
   if (isOffline()) {
     const session = await offlineContext();
-    if (session.user.papel !== "Suporte" && session.user.permissions?.appointments?.create !== true && session.user.permissions?.appointments?.edit !== true) throw new Error("Você não tem permissão para alterar agendamentos offline.");
+    const existing = await readOfflineRecord<Agendamento>(session.userId, "appointments", appointment.id);
+    const action = existing ? "edit" : "create";
+    if (session.user.papel !== "Suporte" && session.user.permissions?.appointments?.[action] !== true) throw new Error("Você não tem permissão para alterar agendamentos offline.");
     if (!appointment.nome.trim() || !appointment.telefone.trim() || !appointment.email.trim() || !appointment.data || !appointment.horario) throw new Error("Preencha os dados obrigatórios do paciente e do agendamento.");
     await saveOfflineRecord(session.userId, "appointments", appointment.id, appointment);
     await enqueueOfflineChange(session.userId, { entity: "appointment", operation: "upsert", payload: appointment });
@@ -362,12 +367,13 @@ export async function listPatients(): Promise<PatientRecord[]> {
 export async function savePatient(patient: Omit<PatientRecord, "criadoEm">): Promise<void> {
   if (isOffline()) {
     const session = await offlineContext();
-    const action = patient.id ? "edit" : "create";
+    const existing = patient.id ? await readOfflineRecord<PatientRecord>(session.userId, "patients", patient.id) : undefined;
+    const action = existing ? "edit" : "create";
     if (session.user.papel !== "Suporte" && session.user.permissions?.patients?.[action] !== true) throw new Error("Você não tem permissão para salvar pacientes.");
     const value: PatientRecord = { ...patient, id: patient.id || crypto.randomUUID(), nome: patient.nome.trim(), telefone: patient.telefone.trim(), email: patient.email.trim().toLowerCase(), criadoEm: new Date().toISOString() };
     if (!value.nome || !value.telefone || !value.email) throw new Error("Preencha nome, telefone e e-mail do paciente.");
     await saveOfflineRecord(session.userId, "patients", value.id, value);
-    await enqueueOfflineChange(session.userId, { entity: "patient", operation: "upsert", payload: value });
+    await enqueueOfflineChange(session.userId, { entity: "patient", operation: "upsert", payload: { ...value, __offlineNew: !existing } });
     return;
   }
   const supabase = createClient();
@@ -422,8 +428,9 @@ export async function syncOfflineChanges(): Promise<{ synced: number; pending: n
   for (const item of queue) {
     try {
       if (item.entity === "patient") {
-        const payload = item.payload as PatientRecord | { id: string };
+        const payload = item.payload as (PatientRecord & { __offlineNew?: boolean }) | { id: string };
         if (item.operation === "delete") await removePatient(payload.id);
+        else if ("__offlineNew" in payload && payload.__offlineNew) await savePatient({ ...(payload as PatientRecord), id: "" });
         else await savePatient(payload as PatientRecord);
       } else {
         const payload = item.payload as Agendamento | { id: string };
