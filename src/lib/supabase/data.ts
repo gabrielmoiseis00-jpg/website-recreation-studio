@@ -237,3 +237,32 @@ export async function removeAppointment(id: string): Promise<void> {
   const { error } = await createClient().from("appointments").delete().eq("id", id);
   throwIfError(error);
 }
+
+
+const RECEIPTS_BUCKET = "appointment-receipts";
+
+export async function uploadReceipt(appointmentId: string, file: File): Promise<string> {
+  const supabase = createClient();
+  const extension = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "file";
+  const path = `${appointmentId}/${crypto.randomUUID()}.${extension}`;
+  const { error } = await supabase.storage
+    .from(RECEIPTS_BUCKET)
+    .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
+  throwIfError(error);
+  return path;
+}
+
+export async function getReceiptUrl(path: string): Promise<string> {
+  const { data, error } = await createClient().storage
+    .from(RECEIPTS_BUCKET)
+    .createSignedUrl(path, 60);
+  throwIfError(error);
+  return data.signedUrl;
+}
+
+export async function deleteReceipt(path: string): Promise<void> {
+  const { error } = await createClient().storage
+    .from(RECEIPTS_BUCKET)
+    .remove([path]);
+  throwIfError(error);
+}
