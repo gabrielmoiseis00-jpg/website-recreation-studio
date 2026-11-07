@@ -50,9 +50,10 @@ function Usuarios() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<ManagedUser | null>(null);
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
-  const [editForm, setEditForm] = useState({ username: "", password: "" });
+  const [editForm, setEditForm] = useState({ username: "", email: "", password: "", role: "secretaria" as Role, active: true });
   const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
+  const [editPermissions, setEditPermissions] = useState<UserPermissions>({});
   const [permissions, setPermissions] = useState<UserPermissions>({});
   const [permissionsLoading, setPermissionsLoading] = useState(false);
   const [form, setForm] = useState({ username: "", email: "", password: "", role: "secretaria" as Role });
@@ -98,10 +99,14 @@ function Usuarios() {
     } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível alterar o acesso."); }
   };
 
-  const openEditUser = (user: ManagedUser) => {
+  const openEditUser = async (user: ManagedUser) => {
     setEditingUser(user);
-    setEditForm({ username: user.username, password: "" });
+    setEditForm({ username: user.username, email: user.email, password: "", role: user.role === "suporte" ? "secretaria" : user.role, active: user.active });
     setShowEditPassword(false);
+    setPermissionsLoading(true);
+    try { setEditPermissions(await getManagedUserPermissions({ data: { userId: user.id } })); }
+    catch (error) { setEditingUser(null); toast.error(error instanceof Error ? error.message : "Não foi possível carregar as permissões."); }
+    finally { setPermissionsLoading(false); }
   };
 
   const submitEditUser = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -112,11 +117,15 @@ function Usuarios() {
       await updateManagedUser({ data: {
         userId: editingUser.id,
         username: editForm.username,
+        email: editForm.email,
         password: editForm.password,
+        role: editForm.role,
+        active: editForm.active,
+        permissions: editPermissions,
       } });
       toast.success("Dados do usuário atualizados com sucesso.");
       setEditingUser(null);
-      setEditForm({ username: "", password: "" });
+      setEditForm({ username: "", email: "", password: "", role: "secretaria", active: true });
       await refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o usuário.");
@@ -242,11 +251,23 @@ function Usuarios() {
       {editingUser && <section className="space-y-4 rounded-xl border bg-card p-5">
         <div>
           <h2 className="text-lg font-semibold">Editar usuário: {editingUser.username}</h2>
-          <p className="text-sm text-muted-foreground">Altere o nome de usuário e, se necessário, defina uma nova senha. A senha atual nunca é exibida.</p>
+          <p className="text-sm text-muted-foreground">Edite os dados de acesso, perfil, situação e permissões. Deixe a senha vazia para manter a atual.</p>
         </div>
         <form onSubmit={submitEditUser} className="grid gap-3 md:grid-cols-2">
           <label className="space-y-1 text-sm font-medium">Nome de usuário
             <input className="input w-full" required minLength={2} maxLength={80} value={editForm.username} onChange={(e) => setEditForm({ ...editForm, username: e.target.value })} />
+          </label>
+          <label className="space-y-1 text-sm font-medium">E-mail de acesso
+            <input className="input w-full" required type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
+          </label>
+          <label className="space-y-1 text-sm font-medium">Perfil
+            <select className="input w-full" value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value as Role })}>
+              {myRole === "suporte" && <option value="medico">Médico</option>}
+              <option value="secretaria">Secretária</option><option value="aplicacao">Aplicação</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm font-medium md:col-span-2">
+            <input type="checkbox" checked={editForm.active} onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })} /> Conta ativa
           </label>
           <label className="space-y-1 text-sm font-medium">Nova senha (opcional)
             <div className="relative">
@@ -256,8 +277,26 @@ function Usuarios() {
               </button>
             </div>
           </label>
+          <div className="md:col-span-2 space-y-3">
+            <h3 className="font-semibold">Permissões do usuário</h3>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="btn-ghost border px-3 py-2" onClick={() => setEditPermissions(Object.fromEntries(areas.map((area) => [area.key, Object.fromEntries(area.actions.map((action) => [action, true]))])))}>Liberar todas</button>
+              <button type="button" className="btn-ghost border px-3 py-2" onClick={() => setEditPermissions(Object.fromEntries(areas.map((area) => [area.key, Object.fromEntries(area.actions.map((action) => [action, false]))])))}>Bloquear todas</button>
+            </div>
+            {permissionsLoading ? <p className="text-sm text-muted-foreground">Carregando permissões...</p> : <div className="grid gap-3 md:grid-cols-2">
+              {areas.map((area) => <div key={area.key} className="rounded-lg border p-3">
+                <h4 className="font-medium">{area.label}</h4>
+                <div className="mt-2 space-y-2">
+                  {area.actions.map((action) => <label key={action} className="flex items-center justify-between gap-3 text-sm">
+                    <span>{actionLabel[action]}</span>
+                    <input type="checkbox" className="h-4 w-4 accent-primary" checked={editPermissions[area.key]?.[action] === true} onChange={(e) => setEditPermissions((current) => ({ ...current, [area.key]: { ...current[area.key], [action]: e.target.checked } }))} />
+                  </label>)}
+                </div>
+              </div>)}
+            </div>}
+          </div>
           <div className="flex flex-wrap gap-2 md:col-span-2">
-            <button disabled={saving} className="btn-primary">{saving ? "Salvando..." : "Salvar alterações"}</button>
+            <button disabled={saving || permissionsLoading} className="btn-primary">{saving ? "Salvando..." : "Salvar todas as alterações"}</button>
             <button type="button" disabled={saving} onClick={() => setEditingUser(null)} className="btn-ghost border px-4 py-2">Cancelar</button>
           </div>
         </form>
