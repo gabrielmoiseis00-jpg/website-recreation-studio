@@ -60,8 +60,13 @@ async function pendingEntityChanges(
     if (item.entity !== entity) continue;
     const id = (item.payload as { id?: string }).id;
     if (!id) continue;
-    if (item.operation === "delete") deletes.add(id);
-    else upserts.add(id);
+    if (item.operation === "delete") {
+      upserts.delete(id);
+      deletes.add(id);
+    } else {
+      deletes.delete(id);
+      upserts.add(id);
+    }
   }
   return { upserts, deletes };
 }
@@ -194,6 +199,13 @@ export async function listAppointments(): Promise<Agendamento[]> {
       if (pendingAppointments.upserts.has(appointment.id) || pendingAppointments.deletes.has(appointment.id)) continue;
       await saveOfflineRecord(session.userId, "appointments", appointment.id, appointment);
     }
+  }
+    const localPending = await listOfflineRecords<Agendamento>(session.userId, "appointments");
+    const pendingById = new Map(localPending.filter((item) => pendingAppointments.upserts.has(item.id)).map((item) => [item.id, item.value]));
+    const merged = new Map(mapped.map((appointment) => [appointment.id, appointment]));
+    for (const id of pendingAppointments.deletes) merged.delete(id);
+    for (const [id, appointment] of pendingById) merged.set(id, appointment);
+    return [...merged.values()].sort((a, b) => a.data.localeCompare(b.data) || a.horario.localeCompare(b.horario));
   }
   return mapped;
 }
@@ -521,6 +533,13 @@ export async function listPatients(): Promise<PatientRecord[]> {
       await saveOfflineRecord(session.userId, "patients", patient.id, patient);
     }
   }
+    const localPending = await listOfflineRecords<PatientRecord>(session.userId, "patients");
+    const pendingById = new Map(localPending.filter((item) => pending.upserts.has(item.id)).map((item) => [item.id, item.value]));
+    const merged = new Map(patients.map((patient) => [patient.id, patient]));
+    for (const id of pending.deletes) merged.delete(id);
+    for (const [id, patient] of pendingById) merged.set(id, patient);
+    return [...merged.values()].sort((a, b) => a.nome.localeCompare(b.nome));
+  }
   return patients;
 }
 
@@ -747,6 +766,13 @@ export async function listMedicalRecords(): Promise<MedicalRecord[]> {
       if (pending.upserts.has(record.id) || pending.deletes.has(record.id)) continue;
       await saveOfflineRecord(session.userId, "medical_records", record.id, record);
     }
+  }
+    const localPending = await listOfflineRecords<MedicalRecord>(session.userId, "medical_records");
+    const pendingById = new Map(localPending.filter((item) => pending.upserts.has(item.id)).map((item) => [item.id, item.value]));
+    const merged = new Map(records.map((record) => [record.id, record]));
+    for (const id of pending.deletes) merged.delete(id);
+    for (const [id, record] of pendingById) merged.set(id, record);
+    return [...merged.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
   return records;
 }
