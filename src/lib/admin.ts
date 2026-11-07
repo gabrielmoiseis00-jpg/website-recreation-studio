@@ -58,6 +58,27 @@ export const listManagedUsers = createServerFn({ method: "GET" }).handler(async 
   }));
 });
 
+
+export const listManagedClinics = createServerFn({ method: "GET" }).handler(async () => {
+  const { admin, profile } = await getAdminContext();
+  if (profile.role !== "suporte") throw new Error("Somente Suporte pode consultar todos os consultórios.");
+  const { data, error } = await admin.from("clinics").select("id, name").order("name");
+  if (error) throw new Error(error.message);
+  return data ?? [];
+});
+
+const createClinicSchema = z.object({ name: z.string().trim().min(2).max(120) });
+export const createManagedClinic = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => createClinicSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { admin, profile } = await getAdminContext();
+    if (profile.role !== "suporte") throw new Error("Somente Suporte pode cadastrar consultórios.");
+    const { data: clinic, error } = await admin.from("clinics")
+      .insert({ name: data.name.trim() }).select("id, name").single();
+    if (error || !clinic) throw new Error(error?.message ?? "Não foi possível cadastrar o consultório.");
+    return clinic;
+  });
+
 const createUserSchema = z.object({
   email: z.string().email(),
   username: z.string().trim().min(2).max(80),
