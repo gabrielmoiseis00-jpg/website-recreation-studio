@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import {
-  brl, exportFinanceiro, fmtDate, list, upsert, METODO_LABEL, PAG_LABEL,
+  brl, exportFinanceiro, fmtDate, METODO_LABEL, PAG_LABEL,
   type Agendamento, type Metodo, type PagStatus,
 } from "@/lib/store";
+import { deleteReceipt, getReceiptUrl, listAppointments, upsertAppointment, uploadReceipt } from "@/lib/supabase/data";
 
 export const Route = createFileRoute("/financeiro")({
   head: () => ({
@@ -27,9 +28,25 @@ function Financeiro() {
   const [q, setQ] = useState("");
   const [st, setSt] = useState("");
   const [ver, setVer] = useState<Agendamento | null>(null);
-  useEffect(() => setRows(list()), []);
+  const [receiptUrl, setReceiptUrl] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  const save = (a: Agendamento) => { upsert(a); setRows(list()); };
+  const refresh = async () => {
+    try { setRows(await listAppointments()); }
+    catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível carregar o financeiro."); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void refresh(); }, []);
+
+  const save = async (a: Agendamento) => {
+    try {
+      await upsertAppointment(a);
+      setRows((current) => current.map((item) => item.id === a.id ? a : item));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar os dados financeiros.");
+    }
+  };
+
   const filtered = useMemo(() => rows
     .filter((r) => !q || r.nome.toLowerCase().includes(q.toLowerCase()))
     .filter((r) => !st || (r.pagStatus ?? "aguardando") === st)
@@ -37,12 +54,43 @@ function Financeiro() {
 
   const tot = (s: PagStatus) => rows.filter((r) => (r.pagStatus ?? "aguardando") === s).reduce((t, r) => t + (r.valor ?? 0), 0);
 
-  const anexar = (r: Agendamento, file?: File) => {
+  const anexar = async (r: Agendamento, file?: File) => {
     if (!file) return;
     if (file.size > 3_000_000) { toast.error("Arquivo muito grande (máx. 3 MB)"); return; }
-    const fr = new FileReader();
-    fr.onload = () => { save({ ...r, comprovante: String(fr.result), comprovanteNome: file.name }); toast.success("Comprovante anexado"); };
-    fr.readAsDataURL(file);
+    if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Envie um PDF, JPG, PNG ou WEBP.");
+      return;
+    }
+    try {
+      const path = await uploadReceipt(r.id, file);
+      await upsertAppointment({ ...r, comprovante: path, comprovanteNome: file.name });
+      setRows((current) => current.map((item) => item.id === r.id ? { ...r, comprovante: path, comprovanteNome: file.name } : item));
+      toast.success("Comprovante anexado com segurança");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível anexar o comprovante.");
+    }
+  };
+
+  const abrirComprovante = async (r: Agendamento) => {
+    if (!r.comprovante) return;
+    try {
+      setReceiptUrl(await getReceiptUrl(r.comprovante));
+      setVer(r);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível abrir o comprovante.");
+    }
+  };
+
+  const removerComprovante = async (r: Agendamento) => {
+    if (!r.comprovante) return;
+    try {
+      await deleteReceipt(r.comprovante);
+      await upsertAppointment({ ...r, comprovante: undefined, comprovanteNome: undefined });
+      setRows((current) => current.map((item) => item.id === r.id ? { ...r, comprovante: undefined, comprovanteNome: undefined } : item));
+      toast.success("Comprovante removido");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível remover o comprovante.");
+    }
   };
 
   return (
@@ -72,7 +120,8 @@ function Financeiro() {
               <tr><th className="p-3">Paciente</th><th className="p-3">Consulta</th><th className="p-3">Valor</th><th className="p-3">Status</th><th className="p-3">Método</th><th className="p-3">Pago em</th><th className="p-3">Comprovante</th></tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">Nenhum registro encontrado</td></tr>}
+              {loading && <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">Carregando dados financeiros…</td></tr>}
+              {!loading && filtered.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">Nenhum registro encontrado</td></tr>}
               {filtered.map((r) => {
                 const s = r.pagStatus ?? "aguardando";
                 return (
@@ -81,33 +130,33 @@ function Financeiro() {
                     <td className="p-3">{fmtDate(r.data)} {r.horario}</td>
                     <td className="p-3">
                       <input type="number" min={0} step="0.01" className="input w-28 py-1" defaultValue={r.valor ?? ""} placeholder="0,00"
-                        onBlur={(e) => save({ ...r, valor: Number(e.target.value) || 0 })} />
+                        onBlur={(e) => void save({ ...r, valor: Number(e.target.value) || 0 })} />
                     </td>
                     <td className="p-3">
                       <select className={`input py-1 ${BADGE[s]}`} value={s}
                         onChange={(e) => {
                           const v = e.target.value as PagStatus;
-                          save({ ...r, pagStatus: v, pagData: v === "pago" ? r.pagData || new Date().toISOString().slice(0, 10) : r.pagData });
+                          void save({ ...r, pagStatus: v, pagData: v === "pago" ? r.pagData || new Date().toISOString().slice(0, 10) : r.pagData });
                         }}>
                         {Object.entries(PAG_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                       </select>
                     </td>
                     <td className="p-3">
-                      <select className="input py-1" value={r.metodo ?? ""} onChange={(e) => save({ ...r, metodo: e.target.value as Metodo })}>
+                      <select className="input py-1" value={r.metodo ?? ""} onChange={(e) => void save({ ...r, metodo: e.target.value as Metodo })}>
                         {Object.entries(METODO_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                       </select>
                     </td>
-                    <td className="p-3"><input type="date" className="input w-auto py-1" value={r.pagData ?? ""} onChange={(e) => save({ ...r, pagData: e.target.value })} /></td>
+                    <td className="p-3"><input type="date" className="input w-auto py-1" value={r.pagData ?? ""} onChange={(e) => void save({ ...r, pagData: e.target.value })} /></td>
                     <td className="p-3">
                       <div className="flex items-center gap-2">
                         <label className="btn-ghost cursor-pointer px-2 py-1" title="Anexar comprovante">
                           <Paperclip className="h-4 w-4" />
-                          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => anexar(r, e.target.files?.[0])} />
+                          <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={(e) => void anexar(r, e.target.files?.[0])} />
                         </label>
                         {r.comprovante && (
                           <>
-                            <button onClick={() => setVer(r)} className="btn-ghost px-2 py-1" aria-label="Ver comprovante"><Eye className="h-4 w-4" /></button>
-                            <button onClick={() => save({ ...r, comprovante: undefined, comprovanteNome: undefined })} className="text-muted-foreground hover:text-destructive" aria-label="Remover comprovante"><X className="h-4 w-4" /></button>
+                            <button onClick={() => void abrirComprovante(r)} className="btn-ghost px-2 py-1" aria-label="Ver comprovante"><Eye className="h-4 w-4" /></button>
+                            <button onClick={() => void removerComprovante(r)} className="text-muted-foreground hover:text-destructive" aria-label="Remover comprovante"><X className="h-4 w-4" /></button>
                           </>
                         )}
                       </div>
@@ -120,17 +169,17 @@ function Financeiro() {
         </div>
       </div>
 
-      {ver?.comprovante && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4" onClick={() => setVer(null)}>
+      {ver && receiptUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4" onClick={() => { setVer(null); setReceiptUrl(""); }}>
           <div className="max-h-full w-full max-w-2xl overflow-auto rounded-xl bg-card p-4" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
               <span className="font-medium">Comprovante — {ver.nome}</span>
-              <button onClick={() => setVer(null)} aria-label="Fechar"><X className="h-5 w-5" /></button>
+              <button onClick={() => { setVer(null); setReceiptUrl(""); }} aria-label="Fechar"><X className="h-5 w-5" /></button>
             </div>
-            {ver.comprovante.startsWith("data:application/pdf")
-              ? <iframe title="Comprovante" src={ver.comprovante} className="h-[70vh] w-full" />
-              : <img src={ver.comprovante} alt="Comprovante" className="mx-auto max-h-[70vh]" />}
-            <a href={ver.comprovante} download={ver.comprovanteNome || "comprovante"} className="btn-primary mt-3">Baixar</a>
+            {ver.comprovanteNome?.toLowerCase().endsWith(".pdf")
+              ? <iframe title="Comprovante" src={receiptUrl} className="h-[70vh] w-full" />
+              : <img src={receiptUrl} alt="Comprovante" className="mx-auto max-h-[70vh]" />}
+            <a href={receiptUrl} target="_blank" rel="noreferrer" className="btn-primary mt-3">Abrir / Baixar</a>
           </div>
         </div>
       )}
