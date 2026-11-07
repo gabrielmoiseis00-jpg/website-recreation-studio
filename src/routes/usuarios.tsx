@@ -5,7 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { getCurrentUser } from "@/lib/auth";
 import {
   createManagedUser, listManagedUsers, setManagedUserActive,
-  getManagedUserPermissions, setManagedUserPermissions, type UserPermissions,
+  getManagedUserPermissions, setManagedUserPermissions, getMyManagedPermissions, type UserPermissions,
 } from "@/lib/admin";
 
 type Role = "medico" | "secretaria" | "aplicacao";
@@ -43,6 +43,7 @@ export const Route = createFileRoute("/usuarios")({
 function Usuarios() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [myRole, setMyRole] = useState<"suporte" | "medico" | null>(null);
+  const [myPermissions, setMyPermissions] = useState<UserPermissions>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -59,8 +60,11 @@ function Usuarios() {
       if (!current || (current.papel !== "Suporte" && current.papel !== "Médico")) {
         setMyRole(null); throw new Error("Acesso permitido somente para Suporte e Médico.");
       }
-      setMyRole(current.papel === "Suporte" ? "suporte" : "medico");
-      setUsers(await listManagedUsers() as ManagedUser[]);
+      const role = current.papel === "Suporte" ? "suporte" : "medico";
+      setMyRole(role);
+      const [managedUsers, ownAccess] = await Promise.all([listManagedUsers(), getMyManagedPermissions()]);
+      setUsers(managedUsers as ManagedUser[]);
+      setMyPermissions(ownAccess.permissions);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Não foi possível carregar os usuários.";
       setLoadError(message);
@@ -130,17 +134,27 @@ function Usuarios() {
           {myRole === "suporte" ? "Gerencie os usuários da Clínica Storbem." : "Cadastre usuários e configure os acessos da Secretária e da Aplicação."}
         </p>
       </div>
-      {myRole === "suporte" && <section className="space-y-3 rounded-xl border bg-card p-5">
+      {(myRole === "suporte" || myRole === "medico") && <section className="space-y-3 rounded-xl border bg-card p-5">
         <div>
-          <h2 className="font-semibold">Suas permissões — Suporte</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Sua conta possui acesso total ao sistema. Todas as áreas e operações estão liberadas automaticamente.</p>
+          <h2 className="font-semibold">Suas permissões — {myRole === "suporte" ? "Suporte" : "Médico"}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {myRole === "suporte"
+              ? "Sua conta possui acesso total ao sistema."
+              : "Estas são as permissões administrativas da sua conta de Médico. Você pode administrar os usuários vinculados à sua clínica."}
+          </p>
         </div>
         <div className="grid gap-2 md:grid-cols-2">
-          {areas.map((area) => <div key={area.key} className="rounded-lg border p-3">
-            <h3 className="font-medium">{area.label}</h3>
-            <p className="mt-1 text-xs text-muted-foreground">{area.actions.map((action) => actionLabel[action]).join(" · ")}</p>
-            <span className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-green-700">✓ Acesso liberado</span>
-          </div>)}
+          {areas.map((area) => {
+            const allEnabled = myRole === "suporte" || area.actions.every((action) => myPermissions[area.key]?.[action] === true);
+            const someEnabled = myRole === "suporte" || area.actions.some((action) => myPermissions[area.key]?.[action] === true);
+            return <div key={area.key} className="rounded-lg border p-3">
+              <h3 className="font-medium">{area.label}</h3>
+              <p className="mt-1 text-xs text-muted-foreground">{area.actions.map((action) => actionLabel[action]).join(" · ")}</p>
+              <span className={allEnabled ? "mt-2 inline-flex items-center gap-1 text-sm font-medium text-green-700" : someEnabled ? "mt-2 inline-flex items-center gap-1 text-sm font-medium text-amber-700" : "mt-2 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground"}>
+                {allEnabled ? "✓ Todas liberadas" : someEnabled ? "Acesso parcial" : "Sem acesso"}
+              </span>
+            </div>;
+          })}
         </div>
       </section>}
 
