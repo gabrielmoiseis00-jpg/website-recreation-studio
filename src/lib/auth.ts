@@ -6,6 +6,7 @@ type Profile = {
   role: "suporte" | "medico" | "secretaria" | "aplicacao";
   active: boolean;
   clinic_id: string | null;
+  permissions: Record<string, Record<string, boolean>> | null;
 };
 
 function toUser(profile: Profile): User {
@@ -16,7 +17,7 @@ function toUser(profile: Profile): User {
     aplicacao: "Aplicação",
   } as const;
 
-  return { usuario: profile.username, papel: papel[profile.role], clinicId: profile.clinic_id ?? undefined };
+  return { usuario: profile.username, papel: papel[profile.role], clinicId: profile.clinic_id ?? undefined, permissions: profile.permissions ?? {} };
 }
 
 export async function login(email: string, password: string): Promise<User> {
@@ -44,7 +45,7 @@ export async function getCurrentUser(): Promise<User | null> {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("username, role, active, clinic_id")
+    .select("username, role, active, clinic_id, permissions")
     .eq("id", authData.user.id)
     .maybeSingle();
 
