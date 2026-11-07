@@ -5,7 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { getCurrentUser } from "@/lib/auth";
 import {
   createManagedUser, listManagedUsers, setManagedUserActive,
-  getManagedUserPermissions, setManagedUserPermissions, getMyManagedPermissions, type UserPermissions,
+  getManagedUserPermissions, setManagedUserPermissions, getMyManagedPermissions, updateManagedUser, type UserPermissions,
 } from "@/lib/admin";
 
 type Role = "medico" | "secretaria" | "aplicacao";
@@ -49,6 +49,10 @@ function Usuarios() {
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<ManagedUser | null>(null);
+  const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
+  const [editForm, setEditForm] = useState({ username: "", password: "" });
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
   const [permissions, setPermissions] = useState<UserPermissions>({});
   const [permissionsLoading, setPermissionsLoading] = useState(false);
   const [form, setForm] = useState({ username: "", email: "", password: "", role: "secretaria" as Role });
@@ -92,6 +96,31 @@ function Usuarios() {
       await setManagedUserActive({ data: { userId: user.id, active: !user.active } });
       toast.success(user.active ? "Usuário bloqueado." : "Usuário reativado."); await refresh();
     } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível alterar o acesso."); }
+  };
+
+  const openEditUser = (user: ManagedUser) => {
+    setEditingUser(user);
+    setEditForm({ username: user.username, password: "" });
+    setShowEditPassword(false);
+  };
+
+  const submitEditUser = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingUser) return;
+    setSaving(true);
+    try {
+      await updateManagedUser({ data: {
+        userId: editingUser.id,
+        username: editForm.username,
+        password: editForm.password,
+      } });
+      toast.success("Dados do usuário atualizados com sucesso.");
+      setEditingUser(null);
+      setEditForm({ username: "", password: "" });
+      await refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o usuário.");
+    } finally { setSaving(false); }
   };
 
   const openPermissions = async (user: ManagedUser) => {
@@ -164,7 +193,12 @@ function Usuarios() {
         <h2 className="font-semibold md:col-span-2">Novo usuário</h2>
         <input className="input" required minLength={2} placeholder="Nome de usuário" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
         <input className="input" required type="email" placeholder="E-mail de acesso" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-        <input className="input" required type="password" minLength={12} autoComplete="new-password" placeholder="Senha (mínimo 12 caracteres)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        <div className="relative">
+          <input className="input w-full pr-12" required type={showCreatePassword ? "text" : "password"} minLength={12} autoComplete="new-password" placeholder="Senha (mínimo 12 caracteres)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          <button type="button" aria-label={showCreatePassword ? "Ocultar senha" : "Mostrar senha"} title={showCreatePassword ? "Ocultar senha" : "Mostrar senha"} className="absolute inset-y-0 right-2 flex items-center px-2 text-muted-foreground" onClick={() => setShowCreatePassword((value) => !value)}>
+            {showCreatePassword ? <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0112 5c5 0 9 4 10 7-0.4 1.2-1.4 2.6-2.8 3.7M6.2 6.2C3.8 7.5 2.4 9.5 2 12c1 3 5 7 10 7 1.3 0 2.5-.3 3.6-.8"/></svg> : <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>}
+          </button>
+        </div>
         <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
           {myRole === "suporte" && <option value="medico">Médico</option>}
           <option value="secretaria">Secretária</option><option value="aplicacao">Aplicação</option>
@@ -195,7 +229,7 @@ function Usuarios() {
               </td>
               <td className="p-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  {user.id !== myUserId && user.role !== "suporte" && (myRole === "suporte" || user.role === "secretaria" || user.role === "aplicacao") && <button type="button" className="btn-ghost border px-3 py-2" onClick={() => void openPermissions(user)}>Configurar permissões</button>}
+                  {user.id !== myUserId && user.role !== "suporte" && (myRole === "suporte" || user.role === "secretaria" || user.role === "aplicacao") && <><button type="button" className="btn-ghost border px-3 py-2" onClick={() => openEditUser(user)}>Editar usuário</button><button type="button" className="btn-ghost border px-3 py-2" onClick={() => void openPermissions(user)}>Configurar permissões</button></>}
                   {user.id !== myUserId && user.role !== "suporte" && <button type="button" className={user.active ? "rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50" : "rounded-lg border border-green-300 px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-50"} onClick={() => void toggleActive(user)}>
                     {user.active ? "Bloquear acesso" : "Ativar usuário"}
                   </button>}
@@ -204,6 +238,30 @@ function Usuarios() {
             </tr>)}</tbody>
           </table></div>}
       </section>
+
+      {editingUser && <section className="space-y-4 rounded-xl border bg-card p-5">
+        <div>
+          <h2 className="text-lg font-semibold">Editar usuário: {editingUser.username}</h2>
+          <p className="text-sm text-muted-foreground">Altere o nome de usuário e, se necessário, defina uma nova senha. A senha atual nunca é exibida.</p>
+        </div>
+        <form onSubmit={submitEditUser} className="grid gap-3 md:grid-cols-2">
+          <label className="space-y-1 text-sm font-medium">Nome de usuário
+            <input className="input w-full" required minLength={2} maxLength={80} value={editForm.username} onChange={(e) => setEditForm({ ...editForm, username: e.target.value })} />
+          </label>
+          <label className="space-y-1 text-sm font-medium">Nova senha (opcional)
+            <div className="relative">
+              <input className="input w-full pr-12" type={showEditPassword ? "text" : "password"} minLength={12} maxLength={128} autoComplete="new-password" placeholder="Deixe vazio para manter a senha atual" value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} />
+              <button type="button" aria-label={showEditPassword ? "Ocultar senha" : "Mostrar senha"} title={showEditPassword ? "Ocultar senha" : "Mostrar senha"} className="absolute inset-y-0 right-2 flex items-center px-2 text-muted-foreground" onClick={() => setShowEditPassword((value) => !value)}>
+                {showEditPassword ? <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0112 5c5 0 9 4 10 7-0.4 1.2-1.4 2.6-2.8 3.7M6.2 6.2C3.8 7.5 2.4 9.5 2 12c1.2 3 5 7 10 7 1.3 0 2.5-.3 3.6-.8"/></svg> : <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>}
+              </button>
+            </div>
+          </label>
+          <div className="flex flex-wrap gap-2 md:col-span-2">
+            <button disabled={saving} className="btn-primary">{saving ? "Salvando..." : "Salvar alterações"}</button>
+            <button type="button" disabled={saving} onClick={() => setEditingUser(null)} className="btn-ghost border px-4 py-2">Cancelar</button>
+          </div>
+        </form>
+      </section>}
 
       {editing && <section className="space-y-4 rounded-xl border bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
