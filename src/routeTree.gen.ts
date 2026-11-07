@@ -14,6 +14,8 @@ import { Route as FinanceiroRouteImport } from './routes/financeiro'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as PacientesIndexRouteImport } from './routes/pacientes.index'
 import { Route as ProntuariosIndexRouteImport } from './routes/prontuarios.index'
+import { Route as RelatoriosRouteImport } from './routes/relatorios'
+import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as UsuariosRouteImport } from './routes/usuarios'
 import { Route as AgendamentosIndexRouteImport } from './routes/agendamentos.index'
 import { Route as AgendamentosIdRouteImport } from './routes/agendamentos.$id'
@@ -38,6 +40,16 @@ const ProntuariosIndexRoute = ProntuariosIndexRouteImport.update({
 const PacientesIndexRoute = PacientesIndexRouteImport.update({
   id: '/pacientes/',
   path: '/pacientes/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RelatoriosRoute = RelatoriosRouteImport.update({
+  id: '/relatorios',
+  path: '/relatorios',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
+  id: '/configuracoes',
+  path: '/configuracoes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FinanceiroRoute = FinanceiroRouteImport.update({
@@ -76,6 +88,10 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/pacientes/': typeof PacientesIndexRoute
   '/prontuarios/': typeof ProntuariosIndexRoute
+  '/relatorios': typeof RelatoriosRoute
+  '/configuracoes': typeof ConfiguracoesRoute
+  '/relatorios': typeof RelatoriosRoute
+  '/configuracoes': typeof ConfiguracoesRoute
   '/financeiro': typeof FinanceiroRoute
   '/usuarios': typeof UsuariosRoute
   '/agendamentos/$id': typeof AgendamentosIdRoute
@@ -114,6 +130,8 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/pacientes/'
     | '/prontuarios/'
+    | '/relatorios'
+    | '/configuracoes'
     | '/financeiro'
     | '/usuarios'
     | '/agendamentos/$id'
@@ -126,6 +144,8 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/pacientes'
     | '/prontuarios'
+    | '/relatorios'
+    | '/configuracoes'
     | '/financeiro'
     | '/usuarios'
     | '/agendamentos/$id'
@@ -147,6 +167,8 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  RelatoriosRoute: typeof RelatoriosRoute
+  ConfiguracoesRoute: typeof ConfiguracoesRoute
   ProntuariosIndexRoute: typeof ProntuariosIndexRoute
   DashboardRoute: typeof DashboardRoute
   PacientesIndexRoute: typeof PacientesIndexRoute
@@ -187,6 +209,20 @@ declare module '@tanstack/react-router' {
       path: '/pacientes'
       fullPath: '/pacientes/'
       preLoaderRoute: typeof PacientesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/relatorios': {
+      id: '/relatorios'
+      path: '/relatorios'
+      fullPath: '/relatorios'
+      preLoaderRoute: typeof RelatoriosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/configuracoes': {
+      id: '/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof ConfiguracoesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/financeiro': {
@@ -235,6 +271,8 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRouteChildren: RootRouteChildren = {
+  RelatoriosRoute: RelatoriosRoute,
+  ConfiguracoesRoute: ConfiguracoesRoute,
   ProntuariosIndexRoute: ProntuariosIndexRoute,
   DashboardRoute: DashboardRoute,
   PacientesIndexRoute: PacientesIndexRoute,
