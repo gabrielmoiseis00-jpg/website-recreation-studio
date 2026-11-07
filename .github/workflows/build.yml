@@ -32,4 +32,4 @@ jobs:
       - name: Verify Netlify output
         run: |
           test -d dist
-          test -d .netlify/v1/functions
+          test -f .netlify/functions-internal/nitro.json
