@@ -145,3 +145,59 @@ export const setManagedUserActive = createServerFn({ method: "POST" })
     if (!changed) throw new Error("Usuário não encontrado ou sem permissão.");
     return { success: true };
   });
+
+const permissionAreas = [
+  "dashboard", "appointments", "patients", "medical_records", "clinical_progress",
+  "finance", "reports", "receipts", "users", "settings",
+] as const;
+const permissionActions = ["view", "create", "edit", "delete", "manage"] as const;
+export type UserPermissions = Record<string, Record<string, boolean>>;
+
+export const getManagedUserPermissions = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) => z.object({ userId: z.string().uuid() }).parse(input))
+  .handler(async ({ data }) => {
+    const { admin, profile } = await getAdminContext();
+    let query = admin.from("profiles").select("id, role, clinic_id, permissions").eq("id", data.userId);
+    if (profile.role !== "suporte") query = query.eq("clinic_id", profile.clinic_id).in("role", ["secretaria", "aplicacao"]);
+    const { data: target, error } = await query.maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!target || target.role === "suporte") throw new Error("Usuário não encontrado ou sem permissão.");
+    return (target.permissions ?? {}) as UserPermissions;
+  });
+
+const permissionSchema = z.object({
+  userId: z.string().uuid(),
+  permissions: z.record(z.string(), z.record(z.string(), z.boolean())),
+});
+export const setManagedUserPermissions = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => permissionSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { admin, profile, userId } = await getAdminContext();
+    let query = admin.from("profiles").select("id, role, clinic_id").eq("id", data.userId);
+    if (profile.role !== "suporte") query = query.eq("clinic_id", profile.clinic_id).in("role", ["secretaria", "aplicacao"]);
+    const { data: target, error: targetError } = await query.maybeSingle();
+    if (targetError) throw new Error(targetError.message);
+    if (!target || target.role === "suporte" || target.id === userId) {
+      throw new Error("Você não pode alterar as permissões deste usuário.");
+    }
+
+    const allowedAreas = new Set<string>(permissionAreas);
+    const allowedActions = new Set<string>(permissionActions);
+    for (const [area, actions] of Object.entries(data.permissions)) {
+      if (!allowedAreas.has(area)) throw new Error("Área de permissão inválida.");
+      for (const [action, enabled] of Object.entries(actions)) {
+        if (!allowedActions.has(action) || typeof enabled !== "boolean") throw new Error("Ação de permissão inválida.");
+        if (profile.role !== "suporte" && enabled && !(
+          profile.role === "medico" && target.clinic_id === profile.clinic_id
+        )) throw new Error("Você não pode conceder uma permissão que não administra.");
+      }
+    }
+    const normalized: UserPermissions = {};
+    for (const area of permissionAreas) {
+      normalized[area] = {};
+      for (const action of permissionActions) normalized[area][action] = data.permissions[area]?.[action] === true;
+    }
+    const { error } = await admin.from("profiles").update({ permissions: normalized }).eq("id", target.id);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  });
