@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentUser } from "@/lib/auth";
+import { uploadClinicLogo } from "@/lib/clinic-logo";
 
 export const Route = createFileRoute("/configuracoes")({ component: Configuracoes });
 
@@ -27,6 +28,7 @@ function Configuracoes() {
   const [settings, setSettings] = useState<Settings>(empty);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -74,21 +76,24 @@ function Configuracoes() {
         throw new Error("Você não tem permissão para alterar as configurações.");
       }
       const cnpjDigits = settings.cnpj.replace(/\D/g, "");
-      if (settings.logo_url && !/^https:\/\//i.test(settings.logo_url.trim())) throw new Error("O logotipo deve usar um endereço HTTPS seguro.");
       if (cnpjDigits && cnpjDigits.length !== 14) throw new Error("Informe um CNPJ válido com 14 números ou deixe o campo vazio.");
       if (settings.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.email)) {
         throw new Error("Informe um e-mail válido.");
       }
+      let logoUrl = settings.logo_url;
+      if (logoFile) logoUrl = await uploadClinicLogo(logoFile, settings.id);
       const { error } = await createClient().from("clinics").update({
         name: settings.name.trim(), cnpj: cnpjDigits || null, email: settings.email.trim() || null,
         phone: settings.phone.trim() || null, address: settings.address.trim() || null,
-        logo_url: settings.logo_url.trim() || null, timezone: settings.timezone,
+        logo_url: logoUrl.trim() || null, timezone: settings.timezone,
         appointment_duration_minutes: settings.appointment_duration_minutes,
       }).eq("id", settings.id);
       if (error) {
         if (error.code === "23505") throw new Error("Este CNPJ já está cadastrado em outra clínica.");
         throw error;
       }
+      setSettings((current) => ({ ...current, logo_url: logoUrl }));
+      setLogoFile(null);
       toast.success("Dados institucionais da clínica salvos.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível salvar as configurações.");
@@ -121,8 +126,10 @@ function Configuracoes() {
       <label className="block text-sm font-medium">Endereço
         <input className="input mt-1" value={settings.address} onChange={e => change("address", e.target.value)} placeholder="Endereço completo" />
       </label>
-      <label className="block text-sm font-medium">Logotipo (URL HTTPS)
-        <input type="url" pattern="https://.*" className="input mt-1" value={settings.logo_url} onChange={e => change("logo_url", e.target.value)} placeholder="https://..." />
+      <label className="block text-sm font-medium">Logotipo da clínica
+        {settings.logo_url && <img src={settings.logo_url} alt="Logotipo atual da clínica" className="mb-2 h-20 w-20 rounded-lg border bg-white object-contain p-2" />}
+        <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="input mt-1 w-full" onChange={e => setLogoFile(e.target.files?.[0] ?? null)} />
+        <span className="mt-1 block text-xs font-normal text-muted-foreground">PNG, JPG, WEBP ou SVG — máximo de 2 MB. {logoFile ? `Selecionado: ${logoFile.name}` : "Selecione uma imagem do computador para substituir o logotipo atual."}</span>
       </label>
       <label className="block text-sm font-medium">Fuso horário
         <select className="input mt-1" value={settings.timezone} onChange={e => change("timezone", e.target.value)}>
