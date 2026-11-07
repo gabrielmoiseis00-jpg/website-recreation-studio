@@ -35,7 +35,7 @@ const actionLabel: Record<string, string> = {
 
 export const Route = createFileRoute("/usuarios")({
   head: () => ({ meta: [
-    { title: "Usuários — Sistema de Agendamentos Clínica Storbem" },
+    { title: "Usuários — Sistema de Agendamentos" },
     { name: "description", content: "Gerenciamento seguro de usuários e permissões." },
   ] }),
   component: () => <AppShell medicoOnly><Usuarios /></AppShell>,
@@ -196,7 +196,7 @@ function Usuarios() {
       <div>
         <h1 className="text-2xl font-bold">Usuários e permissões</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {myRole === "suporte" ? "Gerencie os usuários da Clínica Storbem." : "Gerencie usuários e permissões da sua clínica. Você pode configurar todas as áreas e ações dos usuários sob sua administração."}
+          {myRole === "suporte" ? "Gerencie os usuários e acessos das clínicas cadastradas." : "Gerencie usuários e permissões da sua clínica. Você pode configurar todas as áreas e ações dos usuários sob sua administração."}
         </p>
       </div>
       {(myRole === "suporte" || myRole === "medico") && <section className="space-y-3 rounded-xl border bg-card p-5">
