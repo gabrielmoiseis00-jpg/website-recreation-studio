@@ -12,9 +12,9 @@ import { deleteReceipt, getReceiptUrl, listAppointments, upsertAppointment, uplo
 export const Route = createFileRoute("/financeiro")({
   head: () => ({
     meta: [
-      { title: "Financeiro — Dr. Ricardo" },
+      { title: "Financeiro — Sistema de Gestão" },
       { name: "description", content: "Controle de pagamentos, métodos e comprovantes das consultas." },
-      { property: "og:title", content: "Financeiro — Dr. Ricardo" },
+      { property: "og:title", content: "Financeiro — Sistema de Gestão" },
       { property: "og:description", content: "Controle de pagamentos das consultas." },
     ],
   }),
