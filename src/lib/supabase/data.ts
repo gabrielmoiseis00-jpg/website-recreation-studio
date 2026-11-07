@@ -454,7 +454,7 @@ export async function syncOfflineChanges(): Promise<{ synced: number; pending: n
       } else if (item.entity === "medical_record") {
         const payload = item.payload as MedicalRecord | { id: string };
         if (item.operation === "delete") await removeMedicalRecord(payload.id);
-        else await saveMedicalRecord(payload as MedicalRecord);
+        else await saveMedicalRecord(payload as MedicalRecord & { __offlineNew?: boolean });
       } else {
         const payload = item.payload as Agendamento | { id: string };
         if (item.operation === "delete") await removeAppointment(payload.id);
@@ -550,7 +550,7 @@ export async function listMedicalRecords(): Promise<MedicalRecord[]> {
   return records;
 }
 
-export async function saveMedicalRecord(record: Pick<MedicalRecord, "id" | "patientId" | "title" | "content">): Promise<void> {
+export async function saveMedicalRecord(record: Pick<MedicalRecord, "id" | "patientId" | "title" | "content"> & { __offlineNew?: boolean }): Promise<void> {
   const title = record.title.trim();
   const content = record.content.trim();
   if (!record.patientId || !title || !content) {
@@ -573,13 +573,13 @@ export async function saveMedicalRecord(record: Pick<MedicalRecord, "id" | "pati
       createdAt: existing?.createdAt ?? new Date().toISOString(),
     };
     await saveOfflineRecord(session.userId, "medical_records", value.id, value);
-    await enqueueOfflineChange(session.userId, { entity: "medical_record", operation: "upsert", payload: value });
+    await enqueueOfflineChange(session.userId, { entity: "medical_record", operation: "upsert", payload: { ...value, __offlineNew: !existing } });
     return;
   }
 
   const supabase = createClient();
   const access = await getCurrentAccess();
-  const isEditing = Boolean(record.id);
+  const isEditing = Boolean(record.id) && record.__offlineNew !== true;
   const action = isEditing ? "edit" : "create";
   if (!can(access, "medical_records", action)) throw new Error("Você não tem permissão para salvar prontuários.");
   const clinicId = await getCurrentClinicId();
