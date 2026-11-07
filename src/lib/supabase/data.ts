@@ -90,7 +90,7 @@ export async function listAppointments(): Promise<Agendamento[]> {
 
   const [progressResult, financesResult] = await Promise.all([
     can(access, "clinical_progress", "view") ? supabase.from("patient_weekly_progress").select("*") : Promise.resolve({ data: [], error: null }),
-    can(access, "finance", "view") ? supabase.from("appointment_finances").select("*") : Promise.resolve({ data: [], error: null }),
+    (can(access, "finance", "view") || can(access, "receipts", "view")) ? supabase.from("appointment_finances").select("*") : Promise.resolve({ data: [], error: null }),
   ]);
   throwIfError(progressResult.error);
   throwIfError(financesResult.error);
