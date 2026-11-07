@@ -49,12 +49,21 @@ async function offlineContext() {
   return session;
 }
 
-async function pendingUpsertIds(userId: string, entity: "patient" | "appointment" | "medical_record"): Promise<Set<string>> {
+async function pendingEntityChanges(
+  userId: string,
+  entity: "patient" | "appointment" | "medical_record",
+): Promise<{ upserts: Set<string>; deletes: Set<string> }> {
   const queue = await listOfflineQueue(userId);
-  return new Set(queue
-    .filter((item) => item.entity === entity && item.operation === "upsert")
-    .map((item) => (item.payload as { id?: string }).id)
-    .filter((id): id is string => Boolean(id)));
+  const upserts = new Set<string>();
+  const deletes = new Set<string>();
+  for (const item of queue) {
+    if (item.entity !== entity) continue;
+    const id = (item.payload as { id?: string }).id;
+    if (!id) continue;
+    if (item.operation === "delete") deletes.add(id);
+    else upserts.add(id);
+  }
+  return { upserts, deletes };
 }
 
 function throwIfError(error: { message: string } | null) {
@@ -159,23 +168,29 @@ export async function listAppointments(): Promise<Agendamento[]> {
   const session = getOfflineSessionInfo();
   if (session) {
     const currentPatientIds = new Set(patients.map((patient) => patient.id));
-    const pendingPatientIds = await pendingUpsertIds(session.userId, "patient");
+    const pendingPatients = await pendingEntityChanges(session.userId, "patient");
     const cachedPatients = await listOfflineRecords<PatientRecord>(session.userId, "patients");
     for (const cached of cachedPatients) {
-      if (!currentPatientIds.has(cached.id) && !pendingPatientIds.has(cached.id)) {
+      if (!currentPatientIds.has(cached.id) && !pendingPatients.upserts.has(cached.id)) {
         await deleteOfflineRecord(session.userId, "patients", cached.id);
       }
     }
-    for (const patient of patients) await saveOfflineRecord(session.userId, "patients", patient.id, { id: patient.id, nome: patient.full_name, telefone: patient.phone, email: patient.email, foto: patient.photo_path ?? undefined, criadoEm: new Date().toISOString() });
+    for (const patient of patients) {
+      if (pendingPatients.upserts.has(patient.id) || pendingPatients.deletes.has(patient.id)) continue;
+      await saveOfflineRecord(session.userId, "patients", patient.id, { id: patient.id, nome: patient.full_name, telefone: patient.phone, email: patient.email, foto: patient.photo_path ?? undefined, criadoEm: new Date().toISOString() });
+    }
     const currentAppointmentIds = new Set(mapped.map((appointment) => appointment.id));
-    const pendingAppointmentIds = await pendingUpsertIds(session.userId, "appointment");
+    const pendingAppointments = await pendingEntityChanges(session.userId, "appointment");
     const cachedAppointments = await listOfflineRecords<Agendamento>(session.userId, "appointments");
     for (const cached of cachedAppointments) {
-      if (!currentAppointmentIds.has(cached.id) && !pendingAppointmentIds.has(cached.id)) {
+      if (!currentAppointmentIds.has(cached.id) && !pendingAppointments.upserts.has(cached.id)) {
         await deleteOfflineRecord(session.userId, "appointments", cached.id);
       }
     }
-    for (const appointment of mapped) await saveOfflineRecord(session.userId, "appointments", appointment.id, appointment);
+    for (const appointment of mapped) {
+      if (pendingAppointments.upserts.has(appointment.id) || pendingAppointments.deletes.has(appointment.id)) continue;
+      await saveOfflineRecord(session.userId, "appointments", appointment.id, appointment);
+    }
   }
   return mapped;
 }
@@ -391,14 +406,17 @@ export async function listPatients(): Promise<PatientRecord[]> {
   const session = getOfflineSessionInfo();
   if (session) {
     const currentIds = new Set(patients.map((patient) => patient.id));
-    const pendingIds = await pendingUpsertIds(session.userId, "patient");
+    const pending = await pendingEntityChanges(session.userId, "patient");
     const cached = await listOfflineRecords<PatientRecord>(session.userId, "patients");
     for (const item of cached) {
-      if (!currentIds.has(item.id) && !pendingIds.has(item.id)) {
+      if (!currentIds.has(item.id) && !pending.upserts.has(item.id)) {
         await deleteOfflineRecord(session.userId, "patients", item.id);
       }
     }
-    for (const patient of patients) await saveOfflineRecord(session.userId, "patients", patient.id, patient);
+    for (const patient of patients) {
+      if (pending.upserts.has(patient.id) || pending.deletes.has(patient.id)) continue;
+      await saveOfflineRecord(session.userId, "patients", patient.id, patient);
+    }
   }
   return patients;
 }
@@ -559,16 +577,17 @@ export async function listMedicalRecords(): Promise<MedicalRecord[]> {
   const session = getOfflineSessionInfo();
   if (session) {
     const remoteIds = new Set(records.map((record) => record.id));
-    const queued = await listOfflineQueue(session.userId);
-    const pendingIds = new Set(queued.filter((item) => item.entity === "medical_record" && item.operation === "upsert")
-      .map((item) => (item.payload as MedicalRecord).id));
+    const pending = await pendingEntityChanges(session.userId, "medical_record");
     const cached = await listOfflineRecords<MedicalRecord>(session.userId, "medical_records");
     for (const item of cached) {
-      if (!remoteIds.has(item.id) && !pendingIds.has(item.id)) {
+      if (!remoteIds.has(item.id) && !pending.upserts.has(item.id)) {
         await deleteOfflineRecord(session.userId, "medical_records", item.id);
       }
     }
-    for (const record of records) await saveOfflineRecord(session.userId, "medical_records", record.id, record);
+    for (const record of records) {
+      if (pending.upserts.has(record.id) || pending.deletes.has(record.id)) continue;
+      await saveOfflineRecord(session.userId, "medical_records", record.id, record);
+    }
   }
   return records;
 }
