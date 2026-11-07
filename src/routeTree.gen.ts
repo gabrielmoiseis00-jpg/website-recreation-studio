@@ -16,6 +16,7 @@ import { Route as PacientesIndexRouteImport } from './routes/pacientes.index'
 import { Route as ProntuariosIndexRouteImport } from './routes/prontuarios.index'
 import { Route as RelatoriosRouteImport } from './routes/relatorios'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
+import { Route as RecibosRouteImport } from './routes/recibos'
 import { Route as UsuariosRouteImport } from './routes/usuarios'
 import { Route as AgendamentosIndexRouteImport } from './routes/agendamentos.index'
 import { Route as AgendamentosIdRouteImport } from './routes/agendamentos.$id'
@@ -50,6 +51,11 @@ const RelatoriosRoute = RelatoriosRouteImport.update({
 const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
   id: '/configuracoes',
   path: '/configuracoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecibosRoute = RecibosRouteImport.update({
+  id: '/recibos',
+  path: '/recibos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FinanceiroRoute = FinanceiroRouteImport.update({
@@ -90,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/prontuarios/': typeof ProntuariosIndexRoute
   '/relatorios': typeof RelatoriosRoute
   '/configuracoes': typeof ConfiguracoesRoute
+  '/recibos': typeof RecibosRoute
   '/financeiro': typeof FinanceiroRoute
   '/usuarios': typeof UsuariosRoute
   '/agendamentos/$id': typeof AgendamentosIdRoute
@@ -104,6 +111,7 @@ export interface FileRoutesByTo {
   '/prontuarios': typeof ProntuariosIndexRoute
   '/relatorios': typeof RelatoriosRoute
   '/configuracoes': typeof ConfiguracoesRoute
+  '/recibos': typeof RecibosRoute
   '/financeiro': typeof FinanceiroRoute
   '/usuarios': typeof UsuariosRoute
   '/agendamentos/$id': typeof AgendamentosIdRoute
@@ -119,6 +127,7 @@ export interface FileRoutesById {
   '/prontuarios/': typeof ProntuariosIndexRoute
   '/relatorios': typeof RelatoriosRoute
   '/configuracoes': typeof ConfiguracoesRoute
+  '/recibos': typeof RecibosRoute
   '/financeiro': typeof FinanceiroRoute
   '/usuarios': typeof UsuariosRoute
   '/agendamentos/$id': typeof AgendamentosIdRoute
@@ -135,6 +144,7 @@ export interface FileRouteTypes {
     | '/prontuarios/'
     | '/relatorios'
     | '/configuracoes'
+    | '/recibos'
     | '/financeiro'
     | '/usuarios'
     | '/agendamentos/$id'
@@ -172,6 +182,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  RecibosRoute: typeof RecibosRoute
   RelatoriosRoute: typeof RelatoriosRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   ProntuariosIndexRoute: typeof ProntuariosIndexRoute
@@ -230,6 +241,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConfiguracoesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/recibos': {
+      id: '/recibos'
+      path: '/recibos'
+      fullPath: '/recibos'
+      preLoaderRoute: typeof RecibosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/financeiro': {
       id: '/financeiro'
       path: '/financeiro'
@@ -276,6 +294,7 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRouteChildren: RootRouteChildren = {
+  RecibosRoute: RecibosRoute,
   RelatoriosRoute: RelatoriosRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,
   ProntuariosIndexRoute: ProntuariosIndexRoute,
