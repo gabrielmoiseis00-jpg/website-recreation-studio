@@ -30,7 +30,7 @@ function Login() {
     setLoading(true);
     try {
       await login(email, password);
-      nav({ to: "/agendamentos" });
+      nav({ to: "/dashboard" });
     } catch (error) {
       setErr(error instanceof Error ? error.message : "Não foi possível entrar.");
     } finally {
