@@ -67,7 +67,7 @@ const createUserSchema = z.object({
 });
 
 export const createManagedUser = createServerFn({ method: "POST" })
-  .inputValidator(createUserSchema)
+  .inputValidator((input: unknown) => createUserSchema.parse(input))
   .handler(async ({ data }) => {
     const { admin, profile } = await getAdminContext();
     let clinicId = profile.clinic_id as string | null;
@@ -114,7 +114,7 @@ export const createManagedUser = createServerFn({ method: "POST" })
 
 const activeSchema = z.object({ userId: z.string().uuid(), active: z.boolean() });
 export const setManagedUserActive = createServerFn({ method: "POST" })
-  .inputValidator(activeSchema)
+  .inputValidator((input: unknown) => activeSchema.parse(input))
   .handler(async ({ data }) => {
     const { admin, profile, userId } = await getAdminContext();
     if (data.userId === userId) throw new Error("Você não pode bloquear sua própria conta.");
