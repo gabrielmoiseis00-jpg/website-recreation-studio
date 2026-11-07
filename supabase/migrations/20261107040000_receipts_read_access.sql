@@ -11,7 +11,6 @@ using (
       or public.has_permission('clinical_progress','view')
       or public.has_permission('reports','view')
       or public.has_permission('dashboard','view')
-      or public.has_permission('receipts','view')
     )
   )
 );
@@ -22,6 +21,6 @@ using (
   public.is_support()
   or (
     clinic_id = public.current_user_clinic_id()
-    and (public.has_permission('finance','view') or public.has_permission('receipts','view'))
+    and public.has_permission('finance','view')
   )
 );
