@@ -179,7 +179,8 @@ export async function listAppointments(): Promise<Agendamento[]> {
     const pendingPatients = await pendingEntityChanges(session.userId, "patient");
     const cachedPatients = await listOfflineRecords<PatientRecord>(session.userId, "patients");
     for (const cached of cachedPatients) {
-      if (!currentPatientIds.has(cached.id) && !pendingPatients.upserts.has(cached.id)) {
+      if (pendingPatients.deletes.has(cached.id) ||
+          (!currentPatientIds.has(cached.id) && !pendingPatients.upserts.has(cached.id))) {
         await deleteOfflineRecord(session.userId, "patients", cached.id);
       }
     }
@@ -191,7 +192,8 @@ export async function listAppointments(): Promise<Agendamento[]> {
     const pendingAppointments = await pendingEntityChanges(session.userId, "appointment");
     const cachedAppointments = await listOfflineRecords<Agendamento>(session.userId, "appointments");
     for (const cached of cachedAppointments) {
-      if (!currentAppointmentIds.has(cached.id) && !pendingAppointments.upserts.has(cached.id)) {
+      if (pendingAppointments.deletes.has(cached.id) ||
+          (!currentAppointmentIds.has(cached.id) && !pendingAppointments.upserts.has(cached.id))) {
         await deleteOfflineRecord(session.userId, "appointments", cached.id);
       }
     }
@@ -758,7 +760,7 @@ export async function listMedicalRecords(): Promise<MedicalRecord[]> {
     const pending = await pendingEntityChanges(session.userId, "medical_record");
     const cached = await listOfflineRecords<MedicalRecord>(session.userId, "medical_records");
     for (const item of cached) {
-      if (!remoteIds.has(item.id) && !pending.upserts.has(item.id)) {
+      if (pending.deletes.has(item.id) || (!remoteIds.has(item.id) && !pending.upserts.has(item.id))) {
         await deleteOfflineRecord(session.userId, "medical_records", item.id);
       }
     }
