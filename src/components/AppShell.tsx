@@ -29,21 +29,23 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
     };
 
     void checkUser();
-    const { data: authListener } = (async () => {
-      const { createClient } = await import("@/lib/supabase/client");
-      return createClient().auth.onAuthStateChange((_event, session) => {
+    let unsubscribe: (() => void) | undefined;
+    void import("@/lib/supabase/client").then(({ createClient }) => {
+      if (!active) return;
+      const { data } = createClient().auth.onAuthStateChange((_event, session) => {
         if (!session) {
           setUser(null);
           nav({ to: "/" });
         } else {
-          void checkUser();
+          void Promise.resolve().then(checkUser);
         }
       });
-    })() as unknown as { data: { subscription: { unsubscribe: () => void } } };
+      unsubscribe = () => data.subscription.unsubscribe();
+    });
 
     return () => {
       active = false;
-      authListener.subscription.unsubscribe();
+      unsubscribe?.();
     };
   }, [nav, adminOnly, medicoOnly]);
 
