@@ -207,7 +207,8 @@ export async function upsertAppointment(appointment: Agendamento): Promise<void>
     const action = existing ? "edit" : "create";
     const canEditAppointment = session.user.papel === "Suporte" || session.user.permissions?.appointments?.[action] === true;
     const canEditProgress = session.user.papel === "Suporte" || session.user.permissions?.clinical_progress?.[existing ? "edit" : "create"] === true;
-    if (!canEditAppointment && !canEditProgress) throw new Error("Você não tem permissão para alterar este agendamento ou sua evolução clínica offline.");
+    const canEditFinance = session.user.papel === "Suporte" || session.user.permissions?.finance?.[existing ? "edit" : "create"] === true;
+    if (!canEditAppointment && !canEditProgress && !canEditFinance) throw new Error("Você não tem permissão para alterar este agendamento, evolução ou financeiro offline.");
     if (!appointment.nome.trim() || !appointment.telefone.trim() || !appointment.email.trim() || !appointment.data || !appointment.horario) throw new Error("Preencha os dados obrigatórios do paciente e do agendamento.");
     await saveOfflineRecord(session.userId, "appointments", appointment.id, appointment);
     await enqueueOfflineChange(session.userId, { entity: "appointment", operation: "upsert", payload: appointment });
@@ -319,30 +320,103 @@ async function getCurrentClinicId(): Promise<string> {
 
 const RECEIPTS_BUCKET = "appointment-receipts";
 
-export async function uploadReceipt(appointmentId: string, file: File): Promise<string> {
+const OFFLINE_RECEIPT_PREFIX = "offline-receipt:";
+
+type OfflineReceiptFile = {
+  id: string;
+  appointmentId: string;
+  fileName: string;
+  contentType: string;
+  base64: string;
+};
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function uploadReceiptToCloud(appointmentId: string, file: File): Promise<string> {
   const supabase = createClient();
   const extension = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "file";
   const clinicId = await getCurrentClinicId();
   const path = `${clinicId}/${appointmentId}/${crypto.randomUUID()}.${extension}`;
-  const { error } = await supabase.storage
-    .from(RECEIPTS_BUCKET)
+  const { error } = await supabase.storage.from(RECEIPTS_BUCKET)
     .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
   throwIfError(error);
   return path;
 }
 
+export async function uploadReceipt(appointmentId: string, file: File): Promise<string> {
+  if (isOffline()) {
+    const session = await offlineContext();
+    const allowed = session.user.papel === "Suporte" || session.user.permissions?.finance?.create === true || session.user.permissions?.finance?.edit === true;
+    if (!allowed) throw new Error("Você não tem permissão para anexar comprovantes offline.");
+    const appointment = await readOfflineRecord<Agendamento>(session.userId, "appointments", appointmentId);
+    if (!appointment) throw new Error("Agendamento não disponível neste dispositivo. Conecte-se para atualizar os dados.");
+    const id = crypto.randomUUID();
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const saved: OfflineReceiptFile = {
+      id, appointmentId, fileName: file.name, contentType: file.type || "application/octet-stream",
+      base64: bytesToBase64(bytes),
+    };
+    await saveOfflineRecord(session.userId, "receipt_files", id, saved);
+    await enqueueOfflineChange(session.userId, { entity: "receipt", operation: "upload", payload: saved });
+    return OFFLINE_RECEIPT_PREFIX + id;
+  }
+  const access = await getCurrentAccess();
+  if (!can(access, "finance", "create") && !can(access, "finance", "edit")) throw new Error("Você não tem permissão para anexar comprovantes.");
+  return uploadReceiptToCloud(appointmentId, file);
+}
+
 export async function getReceiptUrl(path: string): Promise<string> {
-  const { data, error } = await createClient().storage
-    .from(RECEIPTS_BUCKET)
-    .createSignedUrl(path, 60);
+  if (path.startsWith(OFFLINE_RECEIPT_PREFIX)) {
+    const session = getOfflineSessionInfo();
+    if (!session) throw new Error("Entre na conta que salvou este comprovante neste dispositivo.");
+    const id = path.slice(OFFLINE_RECEIPT_PREFIX.length);
+    const saved = await readOfflineRecord<OfflineReceiptFile>(session.userId, "receipt_files", id);
+    if (!saved) throw new Error("Comprovante local não encontrado. Conecte-se para sincronizar ou recuperar o arquivo.");
+    return URL.createObjectURL(new Blob([base64ToBytes(saved.base64)], { type: saved.contentType }));
+  }
+  const { data, error } = await createClient().storage.from(RECEIPTS_BUCKET).createSignedUrl(path, 60);
   throwIfError(error);
   return data.signedUrl;
 }
 
 export async function deleteReceipt(path: string): Promise<void> {
-  const { error } = await createClient().storage
-    .from(RECEIPTS_BUCKET)
-    .remove([path]);
+  if (path.startsWith(OFFLINE_RECEIPT_PREFIX)) {
+    const session = await offlineContext();
+    const id = path.slice(OFFLINE_RECEIPT_PREFIX.length);
+    const queue = await listOfflineQueue(session.userId);
+    for (const item of queue) {
+      if (item.entity === "receipt" && item.operation === "upload" &&
+          (item.payload as OfflineReceiptFile).id === id) {
+        await removeOfflineQueueItem(session.userId, item.id);
+      }
+    }
+    await deleteOfflineRecord(session.userId, "receipt_files", id);
+    return;
+  }
+  if (isOffline()) {
+    const session = await offlineContext();
+    const allowed = session.user.papel === "Suporte" || session.user.permissions?.finance?.delete === true;
+    if (!allowed) throw new Error("Você não tem permissão para remover comprovantes offline.");
+    await enqueueOfflineChange(session.userId, { entity: "receipt", operation: "delete", payload: { path } });
+    return;
+  }
+  const access = await getCurrentAccess();
+  if (!can(access, "finance", "delete")) throw new Error("Você não tem permissão para remover comprovantes.");
+  const { error } = await createClient().storage.from(RECEIPTS_BUCKET).remove([path]);
   throwIfError(error);
 }
 
@@ -488,7 +562,32 @@ export async function syncOfflineChanges(): Promise<{ synced: number; pending: n
   let synced = 0;
   for (const item of queue) {
     try {
-      if (item.entity === "patient") {
+      if (item.entity === "receipt") {
+        if (item.operation === "delete") {
+          const payload = item.payload as { path: string };
+          const { error: removeError } = await createClient().storage.from(RECEIPTS_BUCKET).remove([payload.path]);
+          throwIfError(removeError);
+        } else {
+          const payload = item.payload as OfflineReceiptFile;
+          const bytes = base64ToBytes(payload.base64);
+          const file = new File([bytes], payload.fileName, { type: payload.contentType });
+          const remotePath = await uploadReceiptToCloud(payload.appointmentId, file);
+          const localReference = OFFLINE_RECEIPT_PREFIX + payload.id;
+          const pending = await listOfflineQueue(userId);
+          for (const queued of pending) {
+            if (queued.entity !== "appointment" || queued.operation !== "upsert") continue;
+            const appointment = queued.payload as Agendamento;
+            if (appointment.comprovante !== localReference) continue;
+            const updatedAppointment = { ...appointment, comprovante: remotePath, comprovanteNome: payload.fileName };
+            queued.payload = updatedAppointment;
+            await updateOfflineQueueItem(userId, queued);
+            await saveOfflineRecord(userId, "appointments", updatedAppointment.id, updatedAppointment);
+            const inMemory = queue.find((entry) => entry.id === queued.id);
+            if (inMemory) inMemory.payload = updatedAppointment;
+          }
+          await deleteOfflineRecord(userId, "receipt_files", payload.id);
+        }
+      } else if (item.entity === "patient") {
         const payload = item.payload as (PatientRecord & { __offlineNew?: boolean }) | { id: string };
         if (item.operation === "delete") await removePatient(payload.id);
         else await savePatient(payload as PatientRecord & { __offlineNew?: boolean });
