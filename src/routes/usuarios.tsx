@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { uploadClinicLogo } from "@/lib/clinic-logo";
 import {
   createManagedUser, listManagedUsers, listManagedClinics, createManagedClinic, setManagedUserActive,
-  getManagedUserPermissions, setManagedUserPermissions, getMyManagedPermissions, updateManagedUser, type UserPermissions,
+  getManagedUserPermissions, setManagedUserPermissions, getMyManagedPermissions, updateManagedUser,
+  deleteManagedUser, deleteManagedClinic, type UserPermissions,
 } from "@/lib/admin";
 
 type Role = "medico" | "secretaria" | "aplicacao";
@@ -127,6 +128,36 @@ function Usuarios() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar o consultório.");
     } finally { setSaving(false); }
+  };
+
+  const deleteUser = async (user: ManagedUser) => {
+    if (user.id === myUserId || user.role === "suporte") return;
+    if (!confirm(`Excluir permanentemente a conta de ${user.username} ( ${user.email} )? O usuário perderá o acesso, mas os registros clínicos existentes serão preservados.`)) return;
+    try {
+      await deleteManagedUser({ data: { userId: user.id } });
+      toast.success("Usuário excluído com sucesso.");
+      if (editingUser?.id === user.id) setEditingUser(null);
+      if (editing?.id === user.id) setEditing(null);
+      await refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível excluir o usuário.");
+    }
+  };
+
+  const deleteClinic = async (clinic: ManagedClinic) => {
+    if (!confirm(`Excluir o consultório "${clinic.name}"? Esta ação só será permitida se não houver usuários, pacientes, agendamentos, evoluções, dados financeiros ou prontuários vinculados.`)) return;
+    try {
+      await deleteManagedClinic({ data: { clinicId: clinic.id } });
+      if (selectedClinicId === clinic.id) {
+        setSelectedClinicId("");
+        window.localStorage.removeItem("storbem-support-clinic-id");
+        window.dispatchEvent(new Event("storbem-clinics-updated"));
+      }
+      toast.success("Consultório excluído com sucesso.");
+      await refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível excluir o consultório.");
+    }
   };
 
   const toggleActive = async (user: ManagedUser) => {
@@ -264,10 +295,13 @@ function Usuarios() {
           <button disabled={saving} className="btn-primary sm:col-span-2">{saving ? "Salvando..." : "Cadastrar clínica"}</button>
         </form>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {clinics.map((clinic) => <button type="button" key={clinic.id} onClick={() => setSelectedClinicId(clinic.id)} className={selectedClinicId === clinic.id ? "rounded-lg border-2 border-primary bg-primary/5 p-3 text-left" : "rounded-lg border p-3 text-left hover:bg-muted"}>
-            <span className="block font-medium">{clinic.name}</span>
-            <span className="text-xs text-muted-foreground">{selectedClinicId === clinic.id ? "Selecionado para novos usuários" : "Selecionar consultório"}</span>
-          </button>)}
+          {clinics.map((clinic) => <div key={clinic.id} className={selectedClinicId === clinic.id ? "space-y-2 rounded-lg border-2 border-primary bg-primary/5 p-3" : "space-y-2 rounded-lg border p-3"}>
+            <button type="button" onClick={() => setSelectedClinicId(clinic.id)} className="w-full text-left">
+              <span className="block font-medium">{clinic.name}</span>
+              <span className="text-xs text-muted-foreground">{selectedClinicId === clinic.id ? "Selecionado para novos usuários" : "Selecionar consultório"}</span>
+            </button>
+            <button type="button" onClick={() => void deleteClinic(clinic)} className="w-full rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50">Excluir consultório</button>
+          </div>)}
         </div>
       </section>}
 
@@ -325,6 +359,7 @@ function Usuarios() {
                   {user.id !== myUserId && user.role !== "suporte" &&  <button type="button" className={user.active ? "rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50" : "rounded-lg border border-green-300 px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-50"} onClick={() => void toggleActive(user)}>
                     {user.active ? "Bloquear acesso" : "Ativar usuário"}
                   </button>}
+                  {user.id !== myUserId && user.role !== "suporte" && <button type="button" className="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50" onClick={() => void deleteUser(user)}>Excluir usuário</button>}
                 </div>
               </td>
             </tr>)}</tbody>
