@@ -304,7 +304,7 @@ export type PatientRecord = {
 export async function listPatients(): Promise<PatientRecord[]> {
   const supabase = createClient();
   const access = await getCurrentAccess();
-  if (!can(access, "patients", "view")) throw new Error("Você não tem permissão para visualizar pacientes.");
+  if (!can(access, "patients", "view") && !can(access, "medical_records", "view")) throw new Error("Você não tem permissão para visualizar pacientes.");
   const { data, error } = await supabase
     .from("patients")
     .select("id, full_name, phone, email, photo_path, created_at")
