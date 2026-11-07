@@ -21,7 +21,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
       if (!current) {
         setUser(null);
         nav({ to: "/" });
-      } else if ((adminOnly && !isAdmin(current)) || (medicoOnly && current.papel !== "Médico")) {
+      } else if ((adminOnly && !isAdmin(current)) || (medicoOnly && current.papel !== "Médico" && current.papel !== "Suporte")) {
         nav({ to: "/agendamentos" });
       } else {
         setUser(current);
@@ -70,9 +70,9 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
               <Wallet className="h-4 w-4" /> Financeiro
             </Link>
           )}
-          {user.papel === "Médico" && (
+          {(user.papel === "Médico" || user.papel === "Suporte") && (
             <Link to="/usuarios" className="nav-item" activeProps={{ className: "nav-item-active" }}>
-              <Users className="h-4 w-4" /> Usuários
+              <Users className="h-4 w-4" /> {user.papel === "Suporte" ? "Consultórios e usuários" : "Usuários"}
             </Link>
           )}
         </nav>
