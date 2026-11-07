@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { CalendarDays, List, Plus, LogOut, Wallet, Users, Moon, Sun, Palette, LayoutDashboard, ContactRound } from "lucide-react";
+import { CalendarDays, List, Plus, LogOut, Wallet, Users, Moon, Sun, Palette, LayoutDashboard, ContactRound, FileText } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { getCurrentUser, logout } from "@/lib/auth";
 import { type User } from "@/lib/store";
@@ -68,7 +68,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
               <Plus className="h-4 w-4" /> Novo Agendamento
             </Link>}
           </>}
-          {can("patients") && <Link to="/pacientes" className="nav-item" activeProps={{ className: "nav-item-active" }}><ContactRound className="h-4 w-4" /> Pacientes</Link>}\n          {can("finance") && <Link to="/financeiro" className="nav-item" activeProps={{ className: "nav-item-active" }}>
+          {can("medical_records") && <Link to="/prontuarios" className="nav-item" activeProps={{ className: "nav-item-active" }}><FileText className="h-4 w-4" /> Prontuários</Link>}\n          {can("patients") && <Link to="/pacientes" className="nav-item" activeProps={{ className: "nav-item-active" }}><ContactRound className="h-4 w-4" /> Pacientes</Link>}\n          {can("finance") && <Link to="/financeiro" className="nav-item" activeProps={{ className: "nav-item-active" }}>
             <Wallet className="h-4 w-4" /> Financeiro
           </Link>}
           {can("users", "view") && <Link to="/usuarios" className="nav-item" activeProps={{ className: "nav-item-active" }}>
