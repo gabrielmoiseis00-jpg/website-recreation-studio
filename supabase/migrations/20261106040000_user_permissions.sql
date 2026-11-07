@@ -102,7 +102,7 @@ drop policy if exists "patients_insert_tenant" on public.patients;
 drop policy if exists "patients_update_tenant" on public.patients;
 drop policy if exists "patients_delete_medico_or_support" on public.patients;
 create policy "patients_read_permission" on public.patients for select to authenticated
-using (public.is_support() or (public.has_permission('patients','view') and clinic_id = public.current_user_clinic_id()));
+using (public.is_support() or ((public.has_permission('patients','view') or public.has_permission('finance','view') or public.has_permission('clinical_progress','view')) and clinic_id = public.current_user_clinic_id()));
 create policy "patients_insert_permission" on public.patients for insert to authenticated
 with check (public.is_support() or (public.has_permission('patients','create') and clinic_id = public.current_user_clinic_id()));
 create policy "patients_update_permission" on public.patients for update to authenticated
@@ -116,7 +116,7 @@ drop policy if exists "appointments_insert_tenant" on public.appointments;
 drop policy if exists "appointments_update_tenant" on public.appointments;
 drop policy if exists "appointments_delete_admin" on public.appointments;
 create policy "appointments_read_permission" on public.appointments for select to authenticated
-using (public.is_support() or (public.has_permission('appointments','view') and clinic_id = public.current_user_clinic_id()));
+using (public.is_support() or ((public.has_permission('appointments','view') or public.has_permission('finance','view') or public.has_permission('clinical_progress','view')) and clinic_id = public.current_user_clinic_id()));
 create policy "appointments_insert_permission" on public.appointments for insert to authenticated
 with check (public.is_support() or (public.has_permission('appointments','create') and clinic_id = public.current_user_clinic_id()));
 create policy "appointments_update_permission" on public.appointments for update to authenticated
