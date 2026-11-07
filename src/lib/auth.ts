@@ -3,18 +3,20 @@ import type { User } from "@/lib/store";
 
 type Profile = {
   username: string;
-  role: "medico" | "secretaria" | "aplicacao";
+  role: "suporte" | "medico" | "secretaria" | "aplicacao";
   active: boolean;
+  clinic_id: string | null;
 };
 
 function toUser(profile: Profile): User {
   const papel = {
+    suporte: "Suporte",
     medico: "Médico",
     secretaria: "Secretária",
     aplicacao: "Aplicação",
   } as const;
 
-  return { usuario: profile.username, papel: papel[profile.role] };
+  return { usuario: profile.username, papel: papel[profile.role], clinicId: profile.clinic_id ?? undefined };
 }
 
 export async function login(email: string, password: string): Promise<User> {
@@ -29,7 +31,7 @@ export async function login(email: string, password: string): Promise<User> {
   const user = await getCurrentUser();
   if (!user) {
     await supabase.auth.signOut();
-    throw new Error("Usuário sem perfil ativo. Solicite ao médico responsável a liberação do acesso.");
+    throw new Error("Usuário sem perfil ativo. Solicite ao administrador a liberação do acesso.");
   }
 
   return user;
@@ -42,7 +44,7 @@ export async function getCurrentUser(): Promise<User | null> {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("username, role, active")
+    .select("username, role, active, clinic_id")
     .eq("id", authData.user.id)
     .maybeSingle();
 
