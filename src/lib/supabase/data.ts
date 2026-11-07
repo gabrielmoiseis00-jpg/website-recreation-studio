@@ -44,20 +44,20 @@ function throwIfError(error: { message: string } | null) {
   if (error) throw new Error(error.message);
 }
 
-async function getCurrentRole(): Promise<"suporte" | "medico" | "secretaria" | "aplicacao"> {
+type CurrentAccess = { role: "suporte" | "medico" | "secretaria" | "aplicacao"; permissions: Record<string, Record<string, boolean>> };
+async function getCurrentAccess(): Promise<CurrentAccess> {
   const supabase = createClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
   throwIfError(authError);
   if (!authData.user) throw new Error("Sua sessão expirou. Entre novamente.");
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("role, active")
-    .eq("id", authData.user.id)
-    .single();
+  const { data, error } = await supabase.from("profiles").select("role, active, permissions").eq("id", authData.user.id).single();
   throwIfError(error);
-  const profile = data as { role: "suporte" | "medico" | "secretaria" | "aplicacao"; active: boolean };
+  const profile = data as { role: CurrentAccess["role"]; active: boolean; permissions: CurrentAccess["permissions"] | null };
   if (!profile.active) throw new Error("Seu usuário está inativo. Procure o administrador.");
-  return profile.role;
+  return { role: profile.role, permissions: profile.permissions ?? {} };
+}
+function can(access: CurrentAccess, area: string, action: string): boolean {
+  return access.role === "suporte" || access.permissions[area]?.[action] === true;
 }
 
 function mapWeeks(rows: ProgressRow[]): Semana[] {
@@ -75,7 +75,7 @@ function mapWeeks(rows: ProgressRow[]): Semana[] {
 
 export async function listAppointments(): Promise<Agendamento[]> {
   const supabase = createClient();
-  const role = await getCurrentRole();
+  const access = await getCurrentAccess();
   const [patientsResult, appointmentsResult] = await Promise.all([
     supabase.from("patients").select("*"),
     supabase
@@ -88,12 +88,10 @@ export async function listAppointments(): Promise<Agendamento[]> {
   throwIfError(patientsResult.error);
   throwIfError(appointmentsResult.error);
 
-  const [progressResult, financesResult] = role === "aplicacao"
-    ? [{ data: [], error: null }, { data: [], error: null }]
-    : await Promise.all([
-        supabase.from("patient_weekly_progress").select("*"),
-        supabase.from("appointment_finances").select("*"),
-      ]);
+  const [progressResult, financesResult] = await Promise.all([
+    can(access, "clinical_progress", "view") ? supabase.from("patient_weekly_progress").select("*") : Promise.resolve({ data: [], error: null }),
+    can(access, "finance", "view") ? supabase.from("appointment_finances").select("*") : Promise.resolve({ data: [], error: null }),
+  ]);
   throwIfError(progressResult.error);
   throwIfError(financesResult.error);
 
@@ -198,12 +196,12 @@ export async function upsertAppointment(appointment: Agendamento): Promise<void>
   throwIfError(appointmentError);
 
   const role = await getCurrentRole();
-  const progressRows = role === "aplicacao" ? [] : (appointment.semanas ?? []).slice(0, 4).map((week, index) => ({
+  const progressRows = (can(access, "clinical_progress", "edit") || can(access, "clinical_progress", "create")) ? (appointment.semanas ?? []).slice(0, 4).map((week, index) => ({
     appointment_id: appointment.id,
     week_number: index + 1,
     medications: week.meds,
     observations: week.obs,
-  }));
+  })) : [];
   if (progressRows.length) {
     const { error } = await supabase
       .from("patient_weekly_progress")
@@ -211,7 +209,7 @@ export async function upsertAppointment(appointment: Agendamento): Promise<void>
     throwIfError(error);
   }
 
-  const hasFinance = role !== "aplicacao" && (
+  const hasFinance = (can(access, "finance", "edit") || can(access, "finance", "create")) && (
     appointment.valor !== undefined ||
     appointment.pagStatus !== undefined ||
     appointment.metodo !== undefined ||
@@ -285,7 +283,8 @@ const PATIENT_PHOTOS_BUCKET = "patient-photos";
 
 export async function uploadPatientPhoto(file: File): Promise<string> {
   const supabase = createClient();
-  await getCurrentRole();
+  const access = await getCurrentAccess();
+  if (!can(access, "patients", "create") && !can(access, "patients", "edit")) throw new Error("Sem permissão para enviar fotos de pacientes.");
   const extension = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "jpg";
   const clinicId = await getCurrentClinicId();
   const path = `${clinicId}/${crypto.randomUUID()}.${extension}`;
