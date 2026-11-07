@@ -73,6 +73,7 @@ export async function login(email: string, password: string): Promise<User> {
         const dataLayer = await import("@/lib/supabase/data");
         const result = await dataLayer.syncOfflineChanges();
         if (result.synced > 0) console.info(`Sincronização offline: ${result.synced} alteração(ões), ${result.pending} pendente(s).`);
+        await Promise.all([dataLayer.listPatients().catch((error) => console.warn("Cache de pacientes não atualizado.", error)), dataLayer.listAppointments().catch((error) => console.warn("Cache de agendamentos não atualizado.", error))]);
       } catch (syncError) {
         console.warn("Há alterações offline aguardando sincronização.", syncError);
       }
