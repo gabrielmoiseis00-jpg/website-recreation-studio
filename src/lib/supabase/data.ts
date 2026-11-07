@@ -353,3 +353,66 @@ export async function removePatient(id: string): Promise<void> {
   const { error } = await createClient().from("patients").delete().eq("id", id);
   throwIfError(error);
 }
+
+
+export type MedicalRecord = {
+  id: string;
+  patientId: string;
+  patientName: string;
+  title: string;
+  content: string;
+  createdAt: string;
+};
+
+export async function listMedicalRecords(): Promise<MedicalRecord[]> {
+  const supabase = createClient();
+  const access = await getCurrentAccess();
+  if (!can(access, "medical_records", "view")) throw new Error("Você não tem permissão para visualizar prontuários.");
+  const { data, error } = await supabase
+    .from("medical_records")
+    .select("id, patient_id, title, content, created_at, patients(full_name)")
+    .order("created_at", { ascending: false });
+  throwIfError(error);
+  return (data ?? []).map((row) => {
+    const patient = row.patients as unknown as { full_name: string } | null;
+    return {
+      id: row.id as string,
+      patientId: row.patient_id as string,
+      patientName: patient?.full_name ?? "Paciente",
+      title: row.title as string,
+      content: row.content as string,
+      createdAt: row.created_at as string,
+    };
+  });
+}
+
+export async function saveMedicalRecord(record: Pick<MedicalRecord, "id" | "patientId" | "title" | "content">): Promise<void> {
+  const supabase = createClient();
+  const access = await getCurrentAccess();
+  const action = record.id ? "edit" : "create";
+  if (!can(access, "medical_records", action)) throw new Error("Você não tem permissão para salvar prontuários.");
+  const title = record.title.trim();
+  if (!record.patientId || !title || !record.content.trim()) {
+    throw new Error("Selecione o paciente e preencha o título e o conteúdo do prontuário.");
+  }
+  if (record.id) {
+    const { error } = await supabase.from("medical_records").update({ title, content: record.content.trim() }).eq("id", record.id);
+    throwIfError(error);
+    return;
+  }
+  const clinicId = await getCurrentClinicId();
+  const { error } = await supabase.from("medical_records").insert({
+    clinic_id: clinicId,
+    patient_id: record.patientId,
+    title,
+    content: record.content.trim(),
+  });
+  throwIfError(error);
+}
+
+export async function removeMedicalRecord(id: string): Promise<void> {
+  const access = await getCurrentAccess();
+  if (!can(access, "medical_records", "delete")) throw new Error("Você não tem permissão para excluir prontuários.");
+  const { error } = await createClient().from("medical_records").delete().eq("id", id);
+  throwIfError(error);
+}
