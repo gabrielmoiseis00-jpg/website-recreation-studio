@@ -144,14 +144,23 @@ export async function getAppointment(id: string): Promise<Agendamento | undefine
 export async function upsertAppointment(appointment: Agendamento): Promise<void> {
   const supabase = createClient();
 
-  const { data: existingPatient, error: findPatientError } = await supabase
-    .from("patients")
-    .select("id")
-    .eq("email", appointment.email)
+  const { data: existingAppointment, error: existingAppointmentError } = await supabase
+    .from("appointments")
+    .select("patient_id")
+    .eq("id", appointment.id)
     .maybeSingle();
-  throwIfError(findPatientError);
+  throwIfError(existingAppointmentError);
 
-  let patientId = (existingPatient as { id: string } | null)?.id;
+  let patientId = (existingAppointment as { patient_id: string } | null)?.patient_id;
+  if (!patientId) {
+    const { data: matchingPatients, error: findPatientError } = await supabase
+      .from("patients")
+      .select("id")
+      .eq("email", appointment.email)
+      .limit(1);
+    throwIfError(findPatientError);
+    patientId = (matchingPatients?.[0] as { id: string } | undefined)?.id;
+  }
   if (patientId) {
     const { error } = await supabase
       .from("patients")
@@ -159,7 +168,7 @@ export async function upsertAppointment(appointment: Agendamento): Promise<void>
         full_name: appointment.nome,
         phone: appointment.telefone,
         email: appointment.email,
-        photo_path: appointment.foto || null,
+        photo_path: appointment.foto && !appointment.foto.startsWith("data:") ? appointment.foto : null,
       })
       .eq("id", patientId);
     throwIfError(error);
@@ -188,7 +197,8 @@ export async function upsertAppointment(appointment: Agendamento): Promise<void>
   });
   throwIfError(appointmentError);
 
-  const progressRows = (appointment.semanas ?? []).slice(0, 4).map((week, index) => ({
+  const role = await getCurrentRole();
+  const progressRows = role === "aplicacao" ? [] : (appointment.semanas ?? []).slice(0, 4).map((week, index) => ({
     appointment_id: appointment.id,
     week_number: index + 1,
     medications: week.meds,
@@ -201,12 +211,13 @@ export async function upsertAppointment(appointment: Agendamento): Promise<void>
     throwIfError(error);
   }
 
-  const hasFinance =
+  const hasFinance = role !== "aplicacao" && (
     appointment.valor !== undefined ||
     appointment.pagStatus !== undefined ||
     appointment.metodo !== undefined ||
     appointment.pagData !== undefined ||
-    appointment.comprovante !== undefined;
+    appointment.comprovante !== undefined
+  );
 
   if (hasFinance) {
     const { error } = await supabase.from("appointment_finances").upsert({
