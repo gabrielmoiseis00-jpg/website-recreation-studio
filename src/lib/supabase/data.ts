@@ -120,9 +120,10 @@ export async function listAppointments(): Promise<Agendamento[]> {
 
   const supabase = createClient();
   const access = await getCurrentAccess();
+  const clinicId = await getCurrentClinicId();
   const [patientsResult, appointmentsResult] = await Promise.all([
-    supabase.from("patients").select("*"),
-    supabase.from("appointments").select("*")
+    supabase.from("patients").select("*").eq("clinic_id", clinicId),
+    supabase.from("appointments").select("*").eq("clinic_id", clinicId)
       .order("appointment_date", { ascending: true })
       .order("appointment_time", { ascending: true }),
   ]);
@@ -131,10 +132,10 @@ export async function listAppointments(): Promise<Agendamento[]> {
 
   const [progressResult, financesResult] = await Promise.all([
     can(access, "clinical_progress", "view")
-      ? supabase.from("patient_weekly_progress").select("*")
+      ? supabase.from("patient_weekly_progress").select("*").eq("clinic_id", clinicId)
       : Promise.resolve({ data: [], error: null }),
     can(access, "finance", "view")
-      ? supabase.from("appointment_finances").select("*")
+      ? supabase.from("appointment_finances").select("*").eq("clinic_id", clinicId)
       : Promise.resolve({ data: [], error: null }),
   ]);
   throwIfError(progressResult.error);
@@ -232,14 +233,14 @@ export async function upsertAppointment(appointment: Agendamento): Promise<void>
   const access = await getCurrentAccess();
   const clinicId = await getCurrentClinicId();
   const { data: existingAppointment, error: existingAppointmentError } = await supabase.from("appointments")
-    .select("patient_id").eq("id", appointment.id).maybeSingle();
+    .select("patient_id").eq("id", appointment.id).eq("clinic_id", clinicId).maybeSingle();
   throwIfError(existingAppointmentError);
   const appointmentExists = !!existingAppointment;
   let patientId = (existingAppointment as { patient_id: string } | null)?.patient_id;
 
   if (!patientId) {
     const { data: matchingPatients, error: findPatientError } = await supabase.from("patients")
-      .select("id").eq("email", appointment.email).limit(1);
+      .select("id").eq("email", appointment.email).eq("clinic_id", clinicId).limit(1);
     throwIfError(findPatientError);
     patientId = (matchingPatients?.[0] as { id: string } | undefined)?.id;
   }
@@ -248,7 +249,7 @@ export async function upsertAppointment(appointment: Agendamento): Promise<void>
     const { error } = await supabase.from("patients").update({
       full_name: appointment.nome, phone: appointment.telefone, email: appointment.email,
       photo_path: appointment.foto && !appointment.foto.startsWith("data:") ? appointment.foto : null,
-    }).eq("id", patientId);
+    }).eq("id", patientId).eq("clinic_id", clinicId);
     throwIfError(error);
   } else if (!patientId) {
     if (!can(access, "patients", "create")) throw new Error("Você não tem permissão para cadastrar pacientes.");
@@ -308,7 +309,8 @@ export async function removeAppointment(id: string): Promise<void> {
   }
   const access = await getCurrentAccess();
   if (!can(access, "appointments", "delete")) throw new Error("Você não tem permissão para excluir agendamentos.");
-  const { error } = await createClient().from("appointments").delete().eq("id", id);
+  const clinicId = await getCurrentClinicId();
+  const { error } = await createClient().from("appointments").delete().eq("id", id).eq("clinic_id", clinicId);
   throwIfError(error);
 }
 
@@ -519,8 +521,10 @@ export async function listPatients(): Promise<PatientRecord[]> {
   if (!can(access, "patients", "view") && !can(access, "medical_records", "view")) {
     throw new Error("Você não tem permissão para visualizar pacientes.");
   }
+  const clinicId = await getCurrentClinicId();
   const { data, error } = await supabase.from("patients")
     .select("id, full_name, phone, email, photo_path, created_at")
+    .eq("clinic_id", clinicId)
     .order("full_name", { ascending: true });
   throwIfError(error);
   const patients: PatientRecord[] = (data ?? []).map((row) => ({
@@ -581,7 +585,8 @@ export async function savePatient(patient: Omit<PatientRecord, "criadoEm"> & { _
     throw new Error("Preencha nome, telefone e e-mail do paciente.");
   }
   if (isEditing) {
-    const { error } = await supabase.from("patients").update(values).eq("id", patient.id);
+    const clinicId = await getCurrentClinicId();
+    const { error } = await supabase.from("patients").update(values).eq("id", patient.id).eq("clinic_id", clinicId);
     throwIfError(error);
     return;
   }
@@ -604,7 +609,8 @@ export async function removePatient(id: string): Promise<void> {
   }
   const access = await getCurrentAccess();
   if (!can(access, "patients", "delete")) throw new Error("Você não tem permissão para excluir pacientes.");
-  const { error } = await createClient().from("patients").delete().eq("id", id);
+  const clinicId = await getCurrentClinicId();
+  const { error } = await createClient().from("patients").delete().eq("id", id).eq("clinic_id", clinicId);
   throwIfError(error);
 }
 
@@ -735,55 +741,43 @@ export async function listMedicalRecords(): Promise<MedicalRecord[]> {
   if (isOffline()) {
     const session = await offlineContext();
     if (!canUseMedicalRecords(session.user, "view")) throw new Error("Você não tem permissão para visualizar prontuários.");
-    return (await listOfflineRecords<MedicalRecord>(session.userId, "medical_records"))
-      .map((item) => item.value)
+    return (await listOfflineRecords<MedicalRecord>(session.userId, "medical_records")).map((item) => item.value)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
-
   const supabase = createClient();
   const access = await getCurrentAccess();
   if (!can(access, "medical_records", "view")) throw new Error("Você não tem permissão para visualizar prontuários.");
-  const { data, error } = await supabase
-    .from("medical_records")
+  const clinicId = await getCurrentClinicId();
+  const { data, error } = await supabase.from("medical_records")
     .select("id, patient_id, title, content, created_at, patients(full_name)")
-    .order("created_at", { ascending: false });
+    .eq("clinic_id", clinicId).order("created_at", { ascending: false });
   throwIfError(error);
-
-  const records = (data ?? []).map((row) => {
+  const records: MedicalRecord[] = (data ?? []).map((row) => {
     const patient = row.patients as unknown as { full_name: string } | null;
-    return {
-      id: row.id as string,
-      patientId: row.patient_id as string,
-      patientName: patient?.full_name ?? "Paciente",
-      title: row.title as string,
-      content: row.content as string,
-      createdAt: row.created_at as string,
-    };
+    return { id: row.id as string, patientId: row.patient_id as string,
+      patientName: patient?.full_name ?? "Paciente", title: row.title as string,
+      content: row.content as string, createdAt: row.created_at as string };
   });
-
   const session = getOfflineSessionInfo();
-  if (session) {
-    const remoteIds = new Set(records.map((record) => record.id));
-    const pending = await pendingEntityChanges(session.userId, "medical_record");
-    const cached = await listOfflineRecords<MedicalRecord>(session.userId, "medical_records");
-    for (const item of cached) {
-      if (pending.deletes.has(item.id) || (!remoteIds.has(item.id) && !pending.upserts.has(item.id))) {
-        await deleteOfflineRecord(session.userId, "medical_records", item.id);
-      }
-    }
-    for (const record of records) {
-      if (pending.upserts.has(record.id) || pending.deletes.has(record.id)) continue;
-      await saveOfflineRecord(session.userId, "medical_records", record.id, record);
+  if (!session) return records;
+  const pending = await pendingEntityChanges(session.userId, "medical_record");
+  const cached = await listOfflineRecords<MedicalRecord>(session.userId, "medical_records");
+  const remoteIds = new Set(records.map((record) => record.id));
+  for (const item of cached) {
+    if (pending.deletes.has(item.id) || (!remoteIds.has(item.id) && !pending.upserts.has(item.id))) {
+      await deleteOfflineRecord(session.userId, "medical_records", item.id);
     }
   }
-    const localPending = await listOfflineRecords<MedicalRecord>(session.userId, "medical_records");
-    const pendingById = new Map(localPending.filter((item) => pending.upserts.has(item.id)).map((item) => [item.id, item.value]));
-    const merged = new Map(records.map((record) => [record.id, record]));
-    for (const id of pending.deletes) merged.delete(id);
-    for (const [id, record] of pendingById) merged.set(id, record);
-    return [...merged.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  for (const record of records) {
+    if (pending.upserts.has(record.id) || pending.deletes.has(record.id)) continue;
+    await saveOfflineRecord(session.userId, "medical_records", record.id, record);
   }
-  return records;
+  const localPending = await listOfflineRecords<MedicalRecord>(session.userId, "medical_records");
+  const pendingById = new Map(localPending.filter((item) => pending.upserts.has(item.id)).map((item) => [item.id, item.value]));
+  const merged = new Map(records.map((record) => [record.id, record]));
+  for (const id of pending.deletes) merged.delete(id);
+  for (const [id, record] of pendingById) merged.set(id, record);
+  return [...merged.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function saveMedicalRecord(record: Pick<MedicalRecord, "id" | "patientId" | "title" | "content"> & { __offlineNew?: boolean }): Promise<void> {
@@ -823,7 +817,7 @@ export async function saveMedicalRecord(record: Pick<MedicalRecord, "id" | "pati
   if (isEditing) {
     const { error } = await supabase.from("medical_records")
       .update({ title, content })
-      .eq("id", id);
+      .eq("id", id).eq("clinic_id", clinicId);
     throwIfError(error);
     return;
   }
@@ -847,6 +841,7 @@ export async function removeMedicalRecord(id: string): Promise<void> {
   }
   const access = await getCurrentAccess();
   if (!can(access, "medical_records", "delete")) throw new Error("Você não tem permissão para excluir prontuários.");
-  const { error } = await createClient().from("medical_records").delete().eq("id", id);
+  const clinicId = await getCurrentClinicId();
+  const { error } = await createClient().from("medical_records").delete().eq("id", id).eq("clinic_id", clinicId);
   throwIfError(error);
 }
