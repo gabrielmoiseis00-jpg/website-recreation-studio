@@ -414,7 +414,11 @@ export async function savePatient(patient: Omit<PatientRecord, "criadoEm">): Pro
     return;
   }
   const clinicId = await getCurrentClinicId();
-  const { error } = await supabase.from("patients").insert({ ...values, clinic_id: clinicId });
+  const { error } = await supabase.from("patients").insert({
+    ...values,
+    id: patient.id || crypto.randomUUID(),
+    clinic_id: clinicId,
+  });
   throwIfError(error);
 }
 
@@ -446,7 +450,6 @@ export async function syncOfflineChanges(): Promise<{ synced: number; pending: n
       if (item.entity === "patient") {
         const payload = item.payload as (PatientRecord & { __offlineNew?: boolean }) | { id: string };
         if (item.operation === "delete") await removePatient(payload.id);
-        else if ("__offlineNew" in payload && payload.__offlineNew) await savePatient({ ...(payload as PatientRecord), id: "" });
         else await savePatient(payload as PatientRecord);
       } else if (item.entity === "medical_record") {
         const payload = item.payload as MedicalRecord | { id: string };
