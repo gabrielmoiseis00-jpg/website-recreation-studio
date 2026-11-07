@@ -91,3 +91,36 @@ A conta Suporte é independente da conta Médico. Não converta a conta do médi
 As funções de gerenciamento de usuários usam a chave administrativa do Supabase somente no servidor. Configure no Netlify uma variável de ambiente chamada `SUPABASE_SERVICE_ROLE_KEY`, com o valor da chave secreta/service_role do projeto Supabase. Marque-a como sensível. Nunca use prefixo `VITE_`, nunca a coloque no GitHub e nunca a envie pelo chat. Depois de adicionar ou alterar essa variável, gere um novo deploy preview.
 
 O gerenciamento permite que Suporte crie consultórios e médicos e que Médico crie secretárias/usuários de aplicação dentro do próprio consultório. Bloquear um usuário altera o perfil para inativo sem apagar os registros históricos.
+
+
+## Funcionalidades novas em desenvolvimento
+
+Foram adicionadas à branch de teste as páginas:
+- Dashboard / Painel inicial.
+- Pacientes (cadastro independente).
+- Prontuários e histórico clínico.
+- Evolução dos pacientes (atalho para o acompanhamento semanal).
+- Relatórios mensais.
+- Recibos e comprovantes.
+- Configurações da clínica.
+
+### Migrações adicionais obrigatórias
+
+Estas migrações novas ainda precisam ser executadas no SQL Editor do Supabase, **em ordem**, antes de testar as páginas correspondentes:
+
+5. `20261107000000_medical_records.sql` — cria a tabela de prontuários e as políticas de acesso.
+6. `20261107010000_medical_records_patient_access.sql` — permite que profissionais com permissão de prontuário consultem os nomes dos pacientes vinculados.
+7. `20261107020000_reports_read_access.sql` — ajusta a leitura de consultas para Dashboard e Relatórios.
+8. `20261107030000_clinic_settings.sql` — adiciona telefone, endereço, fuso horário e duração padrão às configurações da clínica.
+9. `20261107040000_receipts_read_access.sql` — permite a leitura de metadados dos comprovantes por quem tem permissão de recibos.
+
+A sequência considera que as migrações anteriores até `20261106040000_user_permissions.sql` já foram executadas. Não pule etapas. Não execute novamente migrações antigas que já foram aplicadas.
+
+### Validação após as migrações
+
+- Testar com contas fictícias de Suporte, Médico, Secretária e Aplicação.
+- Confirmar que um usuário sem permissão não consegue ler ou alterar dados diretamente pela API.
+- Confirmar isolamento por `clinic_id`.
+- Testar cadastro, edição e exclusão de pacientes e prontuários.
+- Testar leitura de comprovantes privados e relatórios.
+- Não usar dados reais de pacientes até concluir a revisão de segurança e LGPD.
