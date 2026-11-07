@@ -169,6 +169,7 @@ export interface FileRouteTypes {
     | '/prontuarios'
     | '/relatorios'
     | '/configuracoes'
+    | '/evolucao'
     | '/financeiro'
     | '/usuarios'
     | '/agendamentos/$id'
