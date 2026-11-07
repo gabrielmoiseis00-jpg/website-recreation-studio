@@ -81,14 +81,28 @@ export const listManagedClinics = createServerFn({ method: "GET" }).handler(asyn
   return data ?? [];
 });
 
-const createClinicSchema = z.object({ name: z.string().trim().min(2).max(120) });
+const createClinicSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  cnpj: z.string().trim().max(18).optional().default(""),
+  email: z.string().trim().email().optional().or(z.literal("")).default(""),
+  phone: z.string().trim().max(40).optional().default(""),
+  address: z.string().trim().max(240).optional().default(""),
+  logo_url: z.string().trim().url().optional().or(z.literal("")).default(""),
+});
 export const createManagedClinic = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => createClinicSchema.parse(input))
   .handler(async ({ data }) => {
     const { admin, profile } = await getAdminContext();
     if (profile.role !== "suporte") throw new Error("Somente Suporte pode cadastrar consultórios.");
     const { data: clinic, error } = await admin.from("clinics")
-      .insert({ name: data.name.trim() }).select("id, name").single();
+      .insert({
+        name: data.name.trim(),
+        cnpj: data.cnpj.replace(/\\D/g, "") || null,
+        email: data.email.trim().toLowerCase() || null,
+        phone: data.phone.trim() || null,
+        address: data.address.trim() || null,
+        logo_url: data.logo_url.trim() || null,
+      }).select("id, name").single();
     if (error || !clinic) throw new Error(error?.message ?? "Não foi possível cadastrar o consultório.");
     return clinic;
   });
