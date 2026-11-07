@@ -90,8 +90,6 @@ export interface FileRoutesByFullPath {
   '/prontuarios/': typeof ProntuariosIndexRoute
   '/relatorios': typeof RelatoriosRoute
   '/configuracoes': typeof ConfiguracoesRoute
-  '/relatorios': typeof RelatoriosRoute
-  '/configuracoes': typeof ConfiguracoesRoute
   '/financeiro': typeof FinanceiroRoute
   '/usuarios': typeof UsuariosRoute
   '/agendamentos/$id': typeof AgendamentosIdRoute
@@ -104,6 +102,8 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/pacientes': typeof PacientesIndexRoute
   '/prontuarios': typeof ProntuariosIndexRoute
+  '/relatorios': typeof RelatoriosRoute
+  '/configuracoes': typeof ConfiguracoesRoute
   '/financeiro': typeof FinanceiroRoute
   '/usuarios': typeof UsuariosRoute
   '/agendamentos/$id': typeof AgendamentosIdRoute
@@ -116,6 +116,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/pacientes/': typeof PacientesIndexRoute
+  '/relatorios': typeof RelatoriosRoute
+  '/configuracoes': typeof ConfiguracoesRoute
   '/financeiro': typeof FinanceiroRoute
   '/usuarios': typeof UsuariosRoute
   '/agendamentos/$id': typeof AgendamentosIdRoute
@@ -158,6 +160,8 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/pacientes/'
     | '/prontuarios/'
+    | '/relatorios'
+    | '/configuracoes'
     | '/financeiro'
     | '/usuarios'
     | '/agendamentos/$id'
