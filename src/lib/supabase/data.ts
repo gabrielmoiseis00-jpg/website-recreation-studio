@@ -142,6 +142,7 @@ export async function getAppointment(id: string): Promise<Agendamento | undefine
 export async function upsertAppointment(appointment: Agendamento): Promise<void> {
   const supabase = createClient();
   const access = await getCurrentAccess();
+  const clinicId = await getCurrentClinicId();
   const { data: existingAppointment, error: existingAppointmentError } = await supabase.from("appointments")
     .select("patient_id").eq("id", appointment.id).maybeSingle();
   throwIfError(existingAppointmentError);
@@ -164,6 +165,7 @@ export async function upsertAppointment(appointment: Agendamento): Promise<void>
   } else if (!patientId) {
     if (!can(access, "patients", "create")) throw new Error("Você não tem permissão para cadastrar pacientes.");
     const { data, error } = await supabase.from("patients").insert({
+      clinic_id: clinicId,
       full_name: appointment.nome, phone: appointment.telefone, email: appointment.email,
       photo_path: appointment.foto && !appointment.foto.startsWith("data:") ? appointment.foto : null,
     }).select("id").single();
@@ -175,7 +177,7 @@ export async function upsertAppointment(appointment: Agendamento): Promise<void>
   const appointmentAction = appointmentExists ? "edit" : "create";
   if (can(access, "appointments", appointmentAction)) {
     const { error } = await supabase.from("appointments").upsert({
-      id: appointment.id, patient_id: patientId, appointment_date: appointment.data,
+      id: appointment.id, clinic_id: clinicId, patient_id: patientId, appointment_date: appointment.data,
       appointment_time: appointment.horario, notes: appointment.obs, status: appointment.status,
     });
     throwIfError(error);
@@ -220,10 +222,19 @@ async function getCurrentClinicId(): Promise<string> {
   throwIfError(authError);
   if (!auth.user) throw new Error("Sua sessão expirou. Entre novamente.");
   const { data, error } = await supabase.from("profiles")
-    .select("clinic_id").eq("id", auth.user.id).single();
+    .select("clinic_id, role").eq("id", auth.user.id).single();
   throwIfError(error);
-  if (!data?.clinic_id) throw new Error("Esta conta precisa selecionar um consultório antes de enviar arquivos.");
-  return data.clinic_id as string;
+  if (data?.clinic_id) return data.clinic_id as string;
+
+  // A conta de Suporte não pertence a uma clínica específica. Este sistema
+  // opera com uma única Clínica Storbem, então novos registros usam essa unidade.
+  if (data?.role === "suporte") {
+    const { data: clinics, error: clinicsError } = await supabase.from("clinics").select("id").limit(2);
+    throwIfError(clinicsError);
+    if (clinics?.length === 1) return clinics[0].id as string;
+    throw new Error("Não foi possível identificar a Clínica Storbem. Verifique se existe apenas uma clínica cadastrada.");
+  }
+  throw new Error("Esta conta precisa estar vinculada a um consultório antes de enviar arquivos.");
 }
 
 const RECEIPTS_BUCKET = "appointment-receipts";
