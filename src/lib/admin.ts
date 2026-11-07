@@ -42,7 +42,10 @@ export const listManagedUsers = createServerFn({ method: "GET" }).handler(async 
 
   const { data: authUsers, error: usersError } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
   if (usersError) throw new Error(usersError.message);
+  const { data: clinics, error: clinicsError } = await admin.from("clinics").select("id, name");
+  if (clinicsError) throw new Error(clinicsError.message);
   const emailById = new Map(authUsers.users.map((user) => [user.id, user.email ?? ""]));
+  const clinicNameById = new Map((clinics ?? []).map((clinic) => [clinic.id, clinic.name]));
   return (profiles ?? []).map((item) => ({
     id: item.id,
     username: item.username,
@@ -50,6 +53,7 @@ export const listManagedUsers = createServerFn({ method: "GET" }).handler(async 
     role: item.role as Role,
     active: item.active,
     clinicId: item.clinic_id,
+    clinicName: item.clinic_id ? clinicNameById.get(item.clinic_id) ?? "Consultório" : "Acesso geral",
     createdAt: item.created_at,
   }));
 });
