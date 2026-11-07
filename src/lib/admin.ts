@@ -84,8 +84,6 @@ const createUserSchema = z.object({
   username: z.string().trim().min(2).max(80),
   password: z.string().min(12).max(128),
   role: z.enum(["medico", "secretaria", "aplicacao"]),
-  clinicName: z.string().trim().min(2).max(120).optional(),
-  clinicId: z.string().uuid().optional(),
 });
 
 export const createManagedUser = createServerFn({ method: "POST" })
@@ -94,18 +92,16 @@ export const createManagedUser = createServerFn({ method: "POST" })
     const { admin, profile } = await getAdminContext();
     let clinicId = profile.clinic_id as string | null;
 
-    if (profile.role === "suporte" && data.role === "medico") {
-      if (!data.clinicName) throw new Error("Informe o nome do consultório.");
-      const { data: clinic, error: clinicError } = await admin
-        .from("clinics").insert({ name: data.clinicName }).select("id").single();
-      if (clinicError || !clinic) throw new Error(clinicError?.message ?? "Não foi possível criar o consultório.");
-      clinicId = clinic.id;
-    } else if (profile.role === "suporte") {
-      if (!data.clinicId) throw new Error("Selecione o consultório para vincular este usuário.");
-      const { data: clinic, error: clinicError } = await admin
-        .from("clinics").select("id").eq("id", data.clinicId).single();
-      if (clinicError || !clinic) throw new Error("Consultório não encontrado.");
-      clinicId = clinic.id;
+    if (profile.role === "suporte") {
+      const { data: clinics, error: clinicsError } = await admin.from("clinics").select("id");
+      if (clinicsError) throw new Error(clinicsError.message);
+      if (!clinics || clinics.length !== 1) {
+        throw new Error("A Clínica Storbem precisa ser a única unidade cadastrada para este sistema.");
+      }
+      clinicId = clinics[0].id;
+      const { error: renameError } = await admin.from("clinics")
+        .update({ name: "Clínica Storbem" }).eq("id", clinicId);
+      if (renameError) throw new Error(renameError.message);
     } else if (data.role === "medico") {
       throw new Error("Somente Suporte pode cadastrar outro médico/consultório.");
     }
@@ -118,7 +114,6 @@ export const createManagedUser = createServerFn({ method: "POST" })
       email_confirm: true,
     });
     if (createError || !created.user) {
-      if (profile.role === "suporte") await admin.from("clinics").delete().eq("id", clinicId);
       throw new Error(createError?.message ?? "Não foi possível criar a conta.");
     }
 
@@ -131,7 +126,6 @@ export const createManagedUser = createServerFn({ method: "POST" })
     });
     if (profileError) {
       await admin.auth.admin.deleteUser(created.user.id);
-      if (profile.role === "suporte") await admin.from("clinics").delete().eq("id", clinicId);
       throw new Error(profileError.message);
     }
 
