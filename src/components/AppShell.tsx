@@ -46,6 +46,19 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
     };
 
     void checkUser();
+    const refreshSupportClinics = () => {
+      const selected = window.localStorage.getItem("storbem-support-clinic-id") || "";
+      setSelectedClinicId(selected);
+      void listManagedClinics().then((available) => {
+        if (!active) return;
+        setClinics(available as { id: string; name: string }[]);
+        if (!available.some((clinic) => clinic.id === selected) && available[0]) {
+          setSelectedClinicId(available[0].id);
+          window.localStorage.setItem("storbem-support-clinic-id", available[0].id);
+        }
+      }).catch((error) => console.warn("Não foi possível atualizar os consultórios.", error));
+    };
+    window.addEventListener("storbem-clinics-updated", refreshSupportClinics);
     let unsubscribe: (() => void) | undefined;
     void import("@/lib/supabase/client").then(({ createClient }) => {
       if (!active) return;
@@ -63,6 +76,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
 
     return () => {
       active = false;
+      window.removeEventListener("storbem-clinics-updated", refreshSupportClinics);
       unsubscribe?.();
     };
   }, [nav, adminOnly, medicoOnly]);
