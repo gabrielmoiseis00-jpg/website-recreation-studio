@@ -269,3 +269,43 @@ export async function eraseOfflineVault(userId: string): Promise<void> {
     db.close();
   }
 }
+
+
+export type OfflineQueueItem = {
+  id: string;
+  userId: string;
+  entity: "patient" | "appointment";
+  operation: "upsert" | "delete";
+  payload: unknown;
+  createdAt: string;
+  attempts: number;
+  lastError?: string;
+};
+
+export async function enqueueOfflineChange(
+  userId: string,
+  item: Omit<OfflineQueueItem, "id" | "userId" | "createdAt" | "attempts">,
+): Promise<OfflineQueueItem> {
+  const queued: OfflineQueueItem = {
+    ...item,
+    id: crypto.randomUUID(),
+    userId,
+    createdAt: new Date().toISOString(),
+    attempts: 0,
+  };
+  await saveOfflineRecord(userId, "sync_queue", queued.id, queued);
+  return queued;
+}
+
+export async function listOfflineQueue(userId: string): Promise<OfflineQueueItem[]> {
+  const items = await listOfflineRecords<OfflineQueueItem>(userId, "sync_queue");
+  return items.map((item) => item.value).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+export async function removeOfflineQueueItem(userId: string, queueId: string): Promise<void> {
+  await deleteOfflineRecord(userId, "sync_queue", queueId);
+}
+
+export async function updateOfflineQueueItem(userId: string, item: OfflineQueueItem): Promise<void> {
+  await saveOfflineRecord(userId, "sync_queue", item.id, item);
+}
