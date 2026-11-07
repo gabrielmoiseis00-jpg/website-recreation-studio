@@ -216,7 +216,7 @@ export const setManagedUserActive = createServerFn({ method: "POST" })
     const { admin, profile, userId } = await getAdminContext();
     if (data.userId === userId) throw new Error("Você não pode bloquear sua própria conta.");
     let query = admin.from("profiles").update({ active: data.active }).eq("id", data.userId);
-    if (profile.role !== "suporte") query = query.eq("clinic_id", profile.clinic_id);
+    if (profile.role !== "suporte") query = query.eq("clinic_id", profile.clinic_id).in("role", ["secretaria", "aplicacao"]);
     const { data: changed, error } = await query.select("id").maybeSingle();
     if (error) throw new Error(error.message);
     if (!changed) throw new Error("Usuário não encontrado ou sem permissão.");
