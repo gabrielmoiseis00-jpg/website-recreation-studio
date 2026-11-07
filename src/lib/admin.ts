@@ -324,17 +324,25 @@ export const deleteManagedClinic = createServerFn({ method: "POST" })
     if (!clinic) throw new Error("Consultório não encontrado.");
 
     const checks = await Promise.all([
-      admin.from("profiles").select("id", { count: "exact", head: true }).eq("clinic_id", data.clinicId),
-      admin.from("patients").select("id", { count: "exact", head: true }).eq("clinic_id", data.clinicId),
-      admin.from("appointments").select("id", { count: "exact", head: true }).eq("clinic_id", data.clinicId),
-      admin.from("patient_weekly_progress").select("id", { count: "exact", head: true }).eq("clinic_id", data.clinicId),
-      admin.from("appointment_finances").select("appointment_id", { count: "exact", head: true }).eq("clinic_id", data.clinicId),
-      admin.from("medical_records").select("id", { count: "exact", head: true }).eq("clinic_id", data.clinicId),
-    ]);
-    const failed = checks.find((result) => result.error);
-    if (failed?.error) throw new Error("Não foi possível verificar os dados vinculados: " + failed.error.message);
-    const labels = ["usuários", "pacientes", "agendamentos", "evoluções", "lançamentos financeiros", "prontuários"];
-    const occupied = checks.map((result, index) => ({ label: labels[index], count: result.count ?? 0 }))
+      { label: "usuários", promise: admin.from("profiles").select("id", { count: "exact", head: true }).eq("clinic_id", data.clinicId) },
+      { label: "pacientes", promise: admin.from("patients").select("id", { count: "exact", head: true }).eq("clinic_id", data.clinicId) },
+      { label: "agendamentos", promise: admin.from("appointments").select("id", { count: "exact", head: true }).eq("clinic_id", data.clinicId) },
+      { label: "evoluções", promise: admin.from("patient_weekly_progress").select("id", { count: "exact", head: true }).eq("clinic_id", data.clinicId) },
+      { label: "lançamentos financeiros", promise: admin.from("appointment_finances").select("appointment_id", { count: "exact", head: true }).eq("clinic_id", data.clinicId) },
+      { label: "prontuários", promise: admin.from("medical_records").select("id", { count: "exact", head: true }).eq("clinic_id", data.clinicId) },
+    ].map(async ({ label, promise }) => ({ label, result: await promise })));
+    const failed = checks.find(({ result }) => result.error);
+    if (failed?.result.error) {
+      const dbError = failed.result.error as { message?: string; details?: string; hint?: string; code?: string };
+      const detail = [
+        dbError.message,
+        dbError.details,
+        dbError.hint,
+        dbError.code ? "Código: " + dbError.code : "",
+      ].filter(Boolean).join(" | ") || JSON.stringify(failed.result.error) || "O Supabase não retornou detalhes do erro.";
+      throw new Error("Falha ao verificar " + failed.label + ": " + detail);
+    }
+    const occupied = checks.map(({ label, result }) => ({ label, count: result.count ?? 0 }))
       .filter((item) => item.count > 0);
     if (occupied.length) {
       throw new Error("Este consultório ainda possui " + occupied.map((item) => item.count + " " + item.label).join(", ") + ". Remova ou transfira os dados necessários antes de excluir a clínica. Os registros clínicos não serão apagados automaticamente.");
