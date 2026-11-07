@@ -266,3 +266,27 @@ export async function deleteReceipt(path: string): Promise<void> {
     .remove([path]);
   throwIfError(error);
 }
+
+
+const PATIENT_PHOTOS_BUCKET = "patient-photos";
+
+export async function uploadPatientPhoto(file: File): Promise<string> {
+  const supabase = createClient();
+  const { error: roleError } = await getCurrentRole();
+  void roleError;
+  const extension = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "jpg";
+  const path = `${crypto.randomUUID()}.${extension}`;
+  const { error } = await supabase.storage
+    .from(PATIENT_PHOTOS_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false });
+  throwIfError(error);
+  return path;
+}
+
+export async function getPatientPhotoUrl(path: string): Promise<string> {
+  const { data, error } = await createClient().storage
+    .from(PATIENT_PHOTOS_BUCKET)
+    .createSignedUrl(path, 60);
+  throwIfError(error);
+  return data.signedUrl;
+}
