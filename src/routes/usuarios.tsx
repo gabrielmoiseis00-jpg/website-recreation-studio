@@ -337,7 +337,7 @@ function Usuarios() {
           </div>
           <form onSubmit={submitClinicDeletion} className="space-y-3">
             <label className="block space-y-1 text-sm font-medium">Usuário da conta Suporte
-              <input className="input w-full" required autoComplete="username" value={deleteAuth.username} onChange={(event) => setDeleteAuth({ ...deleteAuth, username: event.target.value })} placeholder="Digite seu usuário administrativo" />
+              <input className="input w-full" required autoComplete="username" value={deleteAuth.username} onChange={(event) => setDeleteAuth({ ...deleteAuth, username: event.target.value })} placeholder="Usuário ou e-mail da conta Suporte" />
             </label>
             <label className="block space-y-1 text-sm font-medium">Senha da conta Suporte
               <input className="input w-full" required type="password" autoComplete="current-password" value={deleteAuth.password} onChange={(event) => setDeleteAuth({ ...deleteAuth, password: event.target.value })} placeholder="Digite sua senha novamente" />
