@@ -25,7 +25,7 @@ export type Metodo = "" | "pix" | "dinheiro" | "credito" | "debito" | "boleto" |
 export const PAG_LABEL: Record<PagStatus, string> = { pago: "Pago", nao_pago: "Não pago", aguardando: "Aguardando" };
 export const METODO_LABEL: Record<Metodo, string> = { "": "—", pix: "Pix", dinheiro: "Dinheiro", credito: "Cartão de crédito", debito: "Cartão de débito", boleto: "Boleto", convenio: "Convênio", transferencia: "Transferência" };
 export const isAdmin = (u: User | null) => !!u && (u.papel === "Suporte" || u.papel === "Médico" || u.papel === "Secretária");
-export type User = { usuario: string; papel: "Suporte" | "Médico" | "Secretária" | "Aplicação"; clinicId?: string };
+export type User = { usuario: string; papel: "Suporte" | "Médico" | "Secretária" | "Aplicação"; clinicId?: string; permissions?: Record<string, Record<string, boolean>> };
 
 const KEY = "agend_data";
 export function list(): Agendamento[] {
