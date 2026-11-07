@@ -102,8 +102,11 @@ function mapWeeks(rows: ProgressRow[]): Semana[] {
 export async function listAppointments(): Promise<Agendamento[]> {
   if (isOffline()) {
     const session = await offlineContext();
-    if (session.user.papel !== "Suporte" && session.user.permissions?.appointments?.view !== true && session.user.permissions?.clinical_progress?.view !== true) {
-      throw new Error("Você não tem permissão para visualizar consultas ou evoluções.");
+    if (session.user.papel !== "Suporte" &&
+        session.user.permissions?.appointments?.view !== true &&
+        session.user.permissions?.clinical_progress?.view !== true &&
+        session.user.permissions?.finance?.view !== true) {
+      throw new Error("Você não tem permissão para visualizar consultas, evoluções ou financeiro.");
     }
     return (await listOfflineRecords<Agendamento>(session.userId, "appointments")).map((item) => item.value);
   }
@@ -292,6 +295,8 @@ export async function removeAppointment(id: string): Promise<void> {
     await enqueueOfflineChange(session.userId, { entity: "appointment", operation: "delete", payload: { id } });
     return;
   }
+  const access = await getCurrentAccess();
+  if (!can(access, "appointments", "delete")) throw new Error("Você não tem permissão para excluir agendamentos.");
   const { error } = await createClient().from("appointments").delete().eq("id", id);
   throwIfError(error);
 }
@@ -396,6 +401,9 @@ export async function getReceiptUrl(path: string): Promise<string> {
 export async function deleteReceipt(path: string): Promise<void> {
   if (path.startsWith(OFFLINE_RECEIPT_PREFIX)) {
     const session = await offlineContext();
+    if (session.user.papel !== "Suporte" && session.user.permissions?.finance?.delete !== true) {
+      throw new Error("Você não tem permissão para remover comprovantes.");
+    }
     const id = path.slice(OFFLINE_RECEIPT_PREFIX.length);
     const queue = await listOfflineQueue(session.userId);
     for (const item of queue) {
