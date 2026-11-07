@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { getCurrentUser } from "@/lib/auth";
-import { createManagedClinic, createManagedUser, listManagedClinics, listManagedUsers, setManagedUserActive } from "@/lib/admin";
+import { createManagedUser, listManagedUsers, setManagedUserActive } from "@/lib/admin";
 
 type Role = "medico" | "secretaria" | "aplicacao";
 type ManagedUser = {
@@ -36,13 +36,11 @@ export const Route = createFileRoute("/usuarios")({
 
 function Usuarios() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
-  const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
-  const [newClinicName, setNewClinicName] = useState("");
   const [myRole, setMyRole] = useState<"suporte" | "medico" | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    username: "", email: "", password: "", role: "medico" as Role, clinicName: "", clinicId: "",
+    username: "", email: "", password: "", role: "secretaria" as Role,
   });
 
   const refresh = async () => {
@@ -60,7 +58,6 @@ function Usuarios() {
 
       const rows = await listManagedUsers();
       setUsers(rows as ManagedUser[]);
-      if (current.papel === "Suporte") setClinics(await listManagedClinics());
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível carregar os usuários.");
     } finally {
@@ -79,28 +76,14 @@ function Usuarios() {
         email: form.email,
         password: form.password,
         role: form.role,
-        ...(myRole === "suporte" && form.role === "medico" ? { clinicName: form.clinicName } : {}),
-        ...(myRole === "suporte" && form.role !== "medico" ? { clinicId: form.clinicId } : {}),
       } });
-      toast.success(myRole === "suporte" ? "Consultório e médico criados com sucesso." : "Usuário criado com sucesso.");
-      setForm({ username: "", email: "", password: "", role: myRole === "suporte" ? "medico" : "secretaria", clinicName: "", clinicId: "" });
+      toast.success("Usuário criado com sucesso.");
+      setForm({ username: "", email: "", password: "", role: myRole === "suporte" ? "secretaria" : "secretaria" });
       await refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível criar o usuário.");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const addClinic = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    try {
-      await createManagedClinic({ data: { name: newClinicName } });
-      setNewClinicName("");
-      toast.success("Consultório cadastrado com sucesso.");
-      await refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar o consultório.");
     }
   };
 
@@ -118,29 +101,14 @@ function Usuarios() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">{myRole === "suporte" ? "Consultórios e usuários" : "Usuários do consultório"}</h1>
+        <h1 className="text-2xl font-bold">"Usuários"</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {myRole === "suporte"
-            ? "Crie consultórios e cadastre o médico responsável por cada um."
-            : "Cadastre secretárias e usuários de aplicação para este consultório."}
+          {myRole === "suporte" ? "Gerencie os usuários da Clínica Storbem." : "Cadastre secretárias e usuários de aplicação para este consultório."}
         </p>
       </div>
 
       <form onSubmit={submit} className="grid gap-3 rounded-xl border bg-card p-5 md:grid-cols-2">
-        <h2 className="font-semibold md:col-span-2">{myRole === "suporte" ? "Novo consultório e médico" : "Novo usuário"}</h2>
-        {myRole === "suporte" && form.role === "medico" && (
-          <input className="input md:col-span-2" required minLength={2} placeholder="Nome do consultório"
-            value={form.clinicName} onChange={(e) => setForm({ ...form, clinicName: e.target.value })} />
-        )}
-        {myRole === "suporte" && form.role !== "medico" && (
-          <select className="input md:col-span-2" required value={form.clinicId}
-            onChange={(e) => setForm({ ...form, clinicId: e.target.value })}>
-            <option value="">Selecione o consultório</option>
-            {clinics.map((clinic) => (
-              <option key={clinic.id} value={clinic.id}>{clinic.name}</option>
-            ))}
-          </select>
-        )}
+        <h2 className="font-semibold md:col-span-2">"Novo usuário"</h2>
         <input className="input" required minLength={2} placeholder="Nome de usuário"
           value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
         <input className="input" required type="email" placeholder="E-mail de acesso"
@@ -158,18 +126,9 @@ function Usuarios() {
           </>}
         </select>
         <button disabled={saving || loading || !myRole} className="btn-primary md:col-span-2">
-          {saving ? "Salvando..." : myRole === "suporte" && form.role === "medico" ? "Criar consultório e médico" : "Criar usuário"}
+          {saving ? "Salvando..." : "Criar usuário"}
         </button>
       </form>
-
-      {myRole === "suporte" && (
-        <form onSubmit={addClinic} className="flex flex-col gap-3 rounded-xl border bg-card p-5 sm:flex-row">
-          <input className="input flex-1" required minLength={2} maxLength={120}
-            placeholder="Nome do novo consultório"
-            value={newClinicName} onChange={(e) => setNewClinicName(e.target.value)} />
-          <button className="btn-primary" type="submit">Adicionar consultório</button>
-        </form>
-      )}
 
       <section className="overflow-hidden rounded-xl border bg-card">
         <div className="border-b p-4 font-semibold">Contas cadastradas</div>
