@@ -103,6 +103,11 @@ function Usuarios() {
       ])),
     }));
   };
+  const toggleAllPermissions = (enabled: boolean) => {
+    setPermissions(Object.fromEntries(areas.map((area) => [
+      area.key, Object.fromEntries(area.actions.map((action) => [action, enabled])),
+    ])));
+  };
   const savePermissions = async () => {
     if (!editing) return;
     setSaving(true);
@@ -169,11 +174,8 @@ function Usuarios() {
               <td className="p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   {user.role !== "suporte" && (myRole === "suporte" || user.role === "secretaria" || user.role === "aplicacao") && <button type="button" className="btn-ghost border px-3 py-2" onClick={() => void openPermissions(user)}>Configurar permissões</button>}
-                  {user.role !== "suporte" && <button type="button" role="switch" aria-checked={user.active} aria-label={user.active ? `Bloquear acesso de ${user.username}` : `Ativar acesso de ${user.username}`} className={user.active ? "inline-flex items-center gap-2 rounded-full border border-green-300 bg-green-50 px-3 py-2 text-xs font-semibold text-green-800" : "inline-flex items-center gap-2 rounded-full border border-red-300 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800"} onClick={() => void toggleActive(user)}>
-                    <span className={user.active ? "relative h-5 w-9 rounded-full bg-green-600" : "relative h-5 w-9 rounded-full bg-red-500"}>
-                      <span className={user.active ? "absolute right-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow" : "absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow"} />
-                    </span>
-                    {user.active ? "Ativo" : "Ativar"}
+                  {user.role !== "suporte" && <button type="button" className={user.active ? "rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50" : "rounded-lg border border-green-300 px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-50"} onClick={() => void toggleActive(user)}>
+                    {user.active ? "Bloquear acesso" : "Ativar usuário"}
                   </button>}
                 </div>
               </td>
@@ -187,7 +189,15 @@ function Usuarios() {
             <p className="text-sm text-muted-foreground">Perfil: {roleLabel[editing.role]}. Marque os acessos que esta conta poderá utilizar.</p></div>
           <button className="btn-ghost border px-3 py-2" onClick={() => setEditing(null)}>Fechar</button>
         </div>
-        {permissionsLoading ? <p>Carregando permissões...</p> : <div className="grid gap-3 md:grid-cols-2">
+        {permissionsLoading ? <p>Carregando permissões...</p> : <>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 p-3">
+            <p className="text-sm font-medium">Acesso geral deste usuário</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-xs font-semibold text-green-800 hover:bg-green-100" onClick={() => toggleAllPermissions(true)}>Liberar todas</button>
+              <button type="button" className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800 hover:bg-red-100" onClick={() => toggleAllPermissions(false)}>Bloquear todas</button>
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
           {areas.map((area) => {
             const areaEnabled = permissions[area.key]?.view === true;
             return <div key={area.key} className="rounded-xl border bg-background p-4 shadow-sm">
@@ -212,7 +222,8 @@ function Usuarios() {
               </div>
             </div>;
           })}
-        </div>}
+          </div>
+        </>}
         <div className="flex flex-wrap gap-2">
           <button disabled={saving || permissionsLoading} onClick={() => void savePermissions()} className="btn-primary">{saving ? "Salvando..." : "Salvar permissões"}</button>
           <button disabled={saving} onClick={() => setEditing(null)} className="btn-ghost border px-4 py-2">Cancelar</button>
