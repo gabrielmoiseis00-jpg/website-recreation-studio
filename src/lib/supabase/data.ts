@@ -147,7 +147,13 @@ export async function listAppointments(): Promise<Agendamento[]> {
   });
   const session = getOfflineSessionInfo();
   if (session) {
+    const currentPatientIds = new Set(patients.map((patient) => patient.id));
+    const cachedPatients = await listOfflineRecords<PatientRecord>(session.userId, "patients");
+    for (const cached of cachedPatients) if (!currentPatientIds.has(cached.id)) await deleteOfflineRecord(session.userId, "patients", cached.id);
     for (const patient of patients) await saveOfflineRecord(session.userId, "patients", patient.id, { id: patient.id, nome: patient.full_name, telefone: patient.phone, email: patient.email, foto: patient.photo_path ?? undefined, criadoEm: new Date().toISOString() });
+    const currentAppointmentIds = new Set(mapped.map((appointment) => appointment.id));
+    const cachedAppointments = await listOfflineRecords<Agendamento>(session.userId, "appointments");
+    for (const cached of cachedAppointments) if (!currentAppointmentIds.has(cached.id)) await deleteOfflineRecord(session.userId, "appointments", cached.id);
     for (const appointment of mapped) await saveOfflineRecord(session.userId, "appointments", appointment.id, appointment);
   }
   return mapped;
@@ -360,7 +366,12 @@ export async function listPatients(): Promise<PatientRecord[]> {
     criadoEm: row.created_at as string,
   }));
   const session = getOfflineSessionInfo();
-  if (session) for (const patient of patients) await saveOfflineRecord(session.userId, "patients", patient.id, patient);
+  if (session) {
+    const currentIds = new Set(patients.map((patient) => patient.id));
+    const cached = await listOfflineRecords<PatientRecord>(session.userId, "patients");
+    for (const item of cached) if (!currentIds.has(item.id)) await deleteOfflineRecord(session.userId, "patients", item.id);
+    for (const patient of patients) await saveOfflineRecord(session.userId, "patients", patient.id, patient);
+  }
   return patients;
 }
 
