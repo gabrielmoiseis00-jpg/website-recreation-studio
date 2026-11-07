@@ -3,7 +3,8 @@ import { Check, ChevronLeft, Pencil, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
-import { emptySemanas, fmtDate, get, upsert, type Agendamento } from "@/lib/store";
+import { emptySemanas, fmtDate, type Agendamento } from "@/lib/store";
+import { getAppointment, upsertAppointment } from "@/lib/supabase/data";
 
 export const Route = createFileRoute("/agendamentos/$id")({
   head: () => ({
@@ -21,7 +22,14 @@ function Detalhe() {
   const { id } = Route.useParams();
   const [a, setA] = useState<Agendamento | null>(null);
   const [w, setW] = useState(0);
-  useEffect(() => { const x = get(id); if (x) setA({ ...x, semanas: x.semanas?.length ? x.semanas : emptySemanas() }); }, [id]);
+  useEffect(() => {
+    let active = true;
+    getAppointment(id).then((x) => {
+      if (!active) return;
+      if (x) setA({ ...x, semanas: x.semanas?.length ? x.semanas : emptySemanas() });
+    }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Não foi possível carregar o acompanhamento."));
+    return () => { active = false; };
+  }, [id]);
   if (!a) return <AppShell><p className="text-muted-foreground">Agendamento não encontrado.</p></AppShell>;
   const sem = a.semanas[w]!;
   const upd = (s: typeof sem) => setA({ ...a, semanas: a.semanas.map((x, i) => (i === w ? s : x)) });
@@ -47,7 +55,7 @@ function Detalhe() {
         </div>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-medium">Progresso da Semana {w + 1}</h3>
-          <button onClick={() => { upsert(a); toast.success("Progresso salvo"); }} className="btn-dark"><Check className="h-4 w-4" /> Salvar</button>
+          <button onClick={() => { void upsertAppointment(a).then(() => toast.success("Progresso salvo")).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Não foi possível salvar o progresso.")); }} className="btn-dark"><Check className="h-4 w-4" /> Salvar</button>
         </div>
         <div className="space-y-4">
           {sem.meds.map((m, i) => {
