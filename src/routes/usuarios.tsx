@@ -40,7 +40,7 @@ function Usuarios() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    username: "", email: "", password: "", role: "secretaria" as Role, clinicName: "",
+    username: "", email: "", password: "", role: "medico" as Role, clinicName: "", clinicId: "",
   });
 
   const refresh = async () => {
@@ -76,10 +76,11 @@ function Usuarios() {
         email: form.email,
         password: form.password,
         role: form.role,
-        ...(myRole === "suporte" ? { clinicName: form.clinicName } : {}),
+        ...(myRole === "suporte" && form.role === "medico" ? { clinicName: form.clinicName } : {}),
+        ...(myRole === "suporte" && form.role !== "medico" ? { clinicId: form.clinicId } : {}),
       } });
       toast.success(myRole === "suporte" ? "Consultório e médico criados com sucesso." : "Usuário criado com sucesso.");
-      setForm({ username: "", email: "", password: "", role: "secretaria", clinicName: "" });
+      setForm({ username: "", email: "", password: "", role: myRole === "suporte" ? "medico" : "secretaria", clinicName: "", clinicId: "" });
       await refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível criar o usuário.");
@@ -112,9 +113,18 @@ function Usuarios() {
 
       <form onSubmit={submit} className="grid gap-3 rounded-xl border bg-card p-5 md:grid-cols-2">
         <h2 className="font-semibold md:col-span-2">{myRole === "suporte" ? "Novo consultório e médico" : "Novo usuário"}</h2>
-        {myRole === "suporte" && (
+        {myRole === "suporte" && form.role === "medico" && (
           <input className="input md:col-span-2" required minLength={2} placeholder="Nome do consultório"
             value={form.clinicName} onChange={(e) => setForm({ ...form, clinicName: e.target.value })} />
+        )}
+        {myRole === "suporte" && form.role !== "medico" && (
+          <select className="input md:col-span-2" required value={form.clinicId}
+            onChange={(e) => setForm({ ...form, clinicId: e.target.value })}>
+            <option value="">Selecione o consultório</option>
+            {[...new Map(users.filter((user) => user.clinicId).map((user) => [user.clinicId, user.clinicName])).entries()].map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+          </select>
         )}
         <input className="input" required minLength={2} placeholder="Nome de usuário"
           value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
@@ -123,13 +133,17 @@ function Usuarios() {
         <input className="input" required type="password" minLength={12} autoComplete="new-password" placeholder="Senha (mínimo 12 caracteres)"
           value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
         <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
-          {myRole === "suporte" ? <option value="medico">Médico</option> : <>
+          {myRole === "suporte" ? <>
+            <option value="medico">Médico</option>
+            <option value="secretaria">Secretária</option>
+            <option value="aplicacao">Aplicação</option>
+          </> : <>
             <option value="secretaria">Secretária</option>
             <option value="aplicacao">Aplicação</option>
           </>}
         </select>
         <button disabled={saving || loading || !myRole} className="btn-primary md:col-span-2">
-          {saving ? "Salvando..." : myRole === "suporte" ? "Criar consultório e médico" : "Criar usuário"}
+          {saving ? "Salvando..." : myRole === "suporte" && form.role === "medico" ? "Criar consultório e médico" : "Criar usuário"}
         </button>
       </form>
 
