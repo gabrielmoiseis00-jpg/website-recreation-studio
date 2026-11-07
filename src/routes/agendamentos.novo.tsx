@@ -1,8 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { PacienteForm } from "@/components/PacienteForm";
-import { emptySemanas, upsert } from "@/lib/store";
+import { emptySemanas } from "@/lib/store";
+import { upsertAppointment } from "@/lib/supabase/data";
 
 export const Route = createFileRoute("/agendamentos/novo")({
   head: () => ({
@@ -26,9 +28,14 @@ function Novo() {
       </div>
       <PacienteForm
         initial={{ nome: "", telefone: "", email: "", foto: "", data: "", horario: "", obs: "" }}
-        onSubmit={(v) => {
-          upsert({ ...v, id: crypto.randomUUID(), status: "agendado", semanas: emptySemanas() });
-          nav({ to: "/agendamentos" });
+        onSubmit={async (v) => {
+          try {
+            await upsertAppointment({ ...v, id: crypto.randomUUID(), status: "agendado", semanas: emptySemanas() });
+            toast.success(typeof navigator !== "undefined" && !navigator.onLine ? "Agendamento salvo neste dispositivo. Aguardando sincronização." : "Agendamento cadastrado com sucesso");
+            nav({ to: "/agendamentos" });
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Não foi possível salvar o agendamento.");
+          }
         }}
         onCancel={() => nav({ to: "/agendamentos" })}
       />

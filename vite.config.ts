@@ -10,9 +10,11 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this
+    // Nitro builds this entry for Netlify Functions.
     server: { entry: "server" },
   },
+  // Use the Netlify Functions output instead of the Lovable sandbox's Cloudflare default.
+  nitro: { preset: "netlify" },
   vite: {
     plugins: [
       VitePWA({

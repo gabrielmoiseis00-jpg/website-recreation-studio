@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { CalendarPlus, FileSpreadsheet, Pencil, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
-import { exportExcel, fmtDate, list, remove, upsert, type Agendamento, type Status } from "@/lib/store";
+import { exportExcel, fmtDate, type Agendamento, type Status } from "@/lib/store";
+import { getPatientPhotoUrl, listAppointments, removeAppointment, upsertAppointment } from "@/lib/supabase/data";
 
 export const Route = createFileRoute("/agendamentos/")({
   head: () => ({
@@ -23,7 +25,19 @@ function Lista() {
   const [q, setQ] = useState("");
   const [d, setD] = useState("");
   const [s, setS] = useState("");
-  useEffect(() => setRows(list()), []);
+  useEffect(() => {
+    let active = true;
+    listAppointments()
+      .then(async (data) => {
+        const withPhotoUrls = await Promise.all(data.map(async (appointment) => ({
+          ...appointment,
+          fotoUrl: appointment.foto ? await getPatientPhotoUrl(appointment.foto).catch(() => undefined) : undefined,
+        })));
+        if (active) setRows(withPhotoUrls);
+      })
+      .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Não foi possível carregar os agendamentos."));
+    return () => { active = false; };
+  }, []);
   const filtered = useMemo(() => rows
     .filter((r) => !q || [r.nome, r.email, r.telefone].join(" ").toLowerCase().includes(q.toLowerCase()))
     .filter((r) => !d || r.data === d)
@@ -59,7 +73,7 @@ function Lista() {
                 <tr key={r.id} className="border-b last:border-0 hover:bg-muted/50">
                   <td className="p-3">
                     <Link to="/agendamentos/$id" params={{ id: r.id }} className="flex items-center gap-2 font-medium hover:text-primary">
-                      {r.foto ? <img src={r.foto} alt="" className="h-8 w-8 rounded-full object-cover" /> : <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-xs text-primary">{r.nome[0]}</span>}
+                      {r.fotoUrl ? <img src={r.fotoUrl} alt="" className="h-8 w-8 rounded-full object-cover" /> : <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-xs text-primary">{r.nome[0]}</span>}
                       {r.nome}
                     </Link>
                   </td>
@@ -67,13 +81,13 @@ function Lista() {
                   <td className="p-3">{fmtDate(r.data)}</td>
                   <td className="p-3">{r.horario}</td>
                   <td className="p-3">
-                    <select className="input py-1" value={r.status} onChange={(e) => { const n = { ...r, status: e.target.value as Status }; upsert(n); setRows(list()); }}>
+                    <select className="input py-1" value={r.status} onChange={async (e) => { const n = { ...r, status: e.target.value as Status }; try { await upsertAppointment(n); setRows((current) => current.map((item) => item.id === n.id ? n : item)); toast.success(typeof navigator !== "undefined" && !navigator.onLine ? "Status salvo neste dispositivo. Aguardando sincronização." : "Status atualizado."); } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o status."); } }}>
                       {STATUS.map((x) => <option key={x} value={x}>{x}</option>)}
                     </select>
                   </td>
                   <td className="p-3 text-right whitespace-nowrap">
                     <Link to="/agendamentos/editar/$id" params={{ id: r.id }} aria-label="Editar cadastro" className="mr-3 inline-flex text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></Link>
-                    <button aria-label="Excluir" onClick={() => { if (confirm("Excluir agendamento?")) { remove(r.id); setRows(list()); } }} className="inline-flex text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                    <button aria-label="Excluir" onClick={async () => { if (confirm("Excluir agendamento?")) { try { await removeAppointment(r.id); setRows((current) => current.filter((item) => item.id !== r.id)); toast.success(typeof navigator !== "undefined" && !navigator.onLine ? "Exclusão salva neste dispositivo. Aguardando sincronização." : "Agendamento excluído."); } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível excluir o agendamento."); } } }} className="inline-flex text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                   </td>
                 </tr>
               ))}

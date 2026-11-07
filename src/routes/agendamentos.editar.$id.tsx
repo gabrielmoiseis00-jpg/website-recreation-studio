@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { PacienteForm } from "@/components/PacienteForm";
-import { get, upsert, type Agendamento } from "@/lib/store";
+import { type Agendamento } from "@/lib/store";
+import { getAppointment, upsertAppointment } from "@/lib/supabase/data";
 
 export const Route = createFileRoute("/agendamentos/editar/$id")({
   head: () => ({
@@ -27,8 +28,14 @@ function Editar() {
   const [missing, setMissing] = useState(false);
 
   useEffect(() => {
-    const x = get(id);
-    if (x) setA(x); else setMissing(true);
+    let active = true;
+    getAppointment(id).then((x) => {
+      if (!active) return;
+      if (x) setA(x); else setMissing(true);
+    }).catch((error: unknown) => {
+      if (active) { setMissing(true); toast.error(error instanceof Error ? error.message : "Não foi possível carregar o cadastro."); }
+    });
+    return () => { active = false; };
   }, [id]);
 
   if (missing) return <AppShell><p className="text-muted-foreground">Agendamento não encontrado.</p></AppShell>;
@@ -47,9 +54,10 @@ function Editar() {
         initial={{ nome: a.nome, telefone: a.telefone, email: a.email, foto: a.foto ?? "", data: a.data, horario: a.horario, obs: a.obs }}
         submitLabel="Salvar Alterações"
         onSubmit={(v) => {
-          upsert({ ...a, ...v });
-          toast.success("Cadastro do paciente atualizado");
-          nav({ to: "/agendamentos/$id", params: { id: a.id } });
+          void upsertAppointment({ ...a, ...v }).then(() => {
+            toast.success(typeof navigator !== "undefined" && !navigator.onLine ? "Alteração salva neste dispositivo. Aguardando sincronização." : "Cadastro do paciente atualizado");
+            nav({ to: "/agendamentos/$id", params: { id: a.id } });
+          }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o cadastro."));
         }}
         onCancel={() => nav({ to: "/agendamentos" })}
       />

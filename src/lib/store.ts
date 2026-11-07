@@ -7,6 +7,7 @@ export type Agendamento = {
   telefone: string;
   email: string;
   foto?: string;
+  fotoUrl?: string;
   data: string;
   horario: string;
   obs: string;
@@ -23,35 +24,10 @@ export type PagStatus = "pago" | "nao_pago" | "aguardando";
 export type Metodo = "" | "pix" | "dinheiro" | "credito" | "debito" | "boleto" | "convenio" | "transferencia";
 export const PAG_LABEL: Record<PagStatus, string> = { pago: "Pago", nao_pago: "Não pago", aguardando: "Aguardando" };
 export const METODO_LABEL: Record<Metodo, string> = { "": "—", pix: "Pix", dinheiro: "Dinheiro", credito: "Cartão de crédito", debito: "Cartão de débito", boleto: "Boleto", convenio: "Convênio", transferencia: "Transferência" };
-export const isAdmin = (u: User | null) => !!u && (u.papel === "Médico" || u.papel === "Secretária");
-export type User = { usuario: string; papel: "Médico" | "Secretária" | "Aplicação" };
-
-export type Conta = { usuario: string; senha: string; papel: User["papel"] };
-const DEFAULT_USERS: Conta[] = [
-  { usuario: "medico", senha: "medico123", papel: "Médico" },
-  { usuario: "secretaria", senha: "secretaria123", papel: "Secretária" },
-  { usuario: "aplicacao", senha: "aplicacao123", papel: "Aplicação" },
-];
-const AKEY = "agend_contas";
-export function listContas(): Conta[] {
-  try { const v = JSON.parse(localStorage.getItem(AKEY) || "null"); return Array.isArray(v) ? v : DEFAULT_USERS; } catch { return DEFAULT_USERS; }
-}
-export function saveContas(c: Conta[]) { localStorage.setItem(AKEY, JSON.stringify(c)); }
+export const isAdmin = (u: User | null) => !!u && (u.papel === "Suporte" || u.papel === "Médico" || u.papel === "Secretária");
+export type User = { usuario: string; papel: "Suporte" | "Médico" | "Secretária" | "Aplicação"; clinicId?: string; permissions?: Record<string, Record<string, boolean>> };
 
 const KEY = "agend_data";
-const UKEY = "agend_user";
-
-export function login(usuario: string, senha: string): User | null {
-  const u = listContas().find((c) => c.usuario === usuario.trim().toLowerCase());
-  if (!u || u.senha !== senha) return null;
-  const user = { usuario: usuario.trim().toLowerCase(), papel: u.papel };
-  localStorage.setItem(UKEY, JSON.stringify(user));
-  return user;
-}
-export const logout = () => localStorage.removeItem(UKEY);
-export function getUser(): User | null {
-  try { return JSON.parse(localStorage.getItem(UKEY) || "null"); } catch { return null; }
-}
 export function list(): Agendamento[] {
   try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; }
 }

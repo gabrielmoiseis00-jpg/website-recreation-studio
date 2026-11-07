@@ -1,5 +1,7 @@
-import { Save } from "lucide-react";
-import { useState } from "react";
+import { Plus, Save, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { getPatientPhotoUrl, uploadPatientPhoto } from "@/lib/supabase/data";
 
 export type PacienteValues = {
   nome: string;
@@ -23,19 +25,66 @@ export function PacienteForm({
   onCancel: () => void;
 }) {
   const [f, setF] = useState<PacienteValues>(initial);
+  const [fotoPreview, setFotoPreview] = useState("");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [telefones, setTelefones] = useState<string[]>(initial.telefone ? initial.telefone.split(" | ").filter(Boolean) : [""]);
   const set = (k: keyof PacienteValues) => (e: { target: { value: string } }) => setF((p) => ({ ...p, [k]: e.target.value }));
-  const onFoto = (file?: File) => {
+
+  useEffect(() => {
+    let active = true;
+    if (!initial.foto) {
+      setFotoPreview("");
+      return;
+    }
+    if (initial.foto.startsWith("blob:") || initial.foto.startsWith("data:") || initial.foto.startsWith("http")) {
+      setFotoPreview(initial.foto);
+      return;
+    }
+    getPatientPhotoUrl(initial.foto).then((url) => {
+      if (active) setFotoPreview(url);
+    }).catch(() => {
+      if (active) setFotoPreview("");
+    });
+    return () => { active = false; };
+  }, [initial.foto]);
+
+  const onFoto = async (file?: File) => {
     if (!file) return;
-    const r = new FileReader();
-    r.onload = () => setF((p) => ({ ...p, foto: String(r.result) }));
-    r.readAsDataURL(file);
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Envie uma foto JPG, PNG ou WEBP.");
+      return;
+    }
+    if (file.size > 2_000_000) {
+      toast.error("A foto deve ter no máximo 2 MB.");
+      return;
+    }
+    setUploadingPhoto(true);
+    try {
+      const path = await uploadPatientPhoto(file);
+      setF((p) => ({ ...p, foto: path }));
+      setFotoPreview(URL.createObjectURL(file));
+      toast.success("Foto enviada com segurança.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível enviar a foto.");
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit(f);
+        if (uploadingPhoto) {
+          toast.error("Aguarde o envio da foto terminar.");
+          return;
+        }
+        const telefonesValidos = telefones.map((telefone) => telefone.trim()).filter(Boolean);
+        if (telefonesValidos.length === 0) {
+          toast.error("Informe pelo menos um telefone do paciente.");
+          return;
+        }
+        onSubmit({ ...f, telefone: telefonesValidos.join(" | ") });
       }}
       className="rounded-xl border bg-card p-6"
     >
@@ -43,17 +92,31 @@ export function PacienteForm({
         <section className="space-y-4">
           <h2 className="font-semibold">Dados do Paciente</h2>
           <Field label="Nome Completo *"><input required className="input" placeholder="Nome completo do paciente" value={f.nome} onChange={set("nome")} /></Field>
-          <Field label="Telefone (WhatsApp) *"><input required className="input" placeholder="(00) 00000-0000" value={f.telefone} onChange={set("telefone")} /></Field>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium">Telefones (WhatsApp) *</span>
+              <span className="text-xs text-muted-foreground">{telefones.length} {telefones.length === 1 ? "telefone" : "telefones"}</span>
+            </div>
+            {telefones.map((telefone, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <input required={index === 0 || telefone.length > 0} type="tel" inputMode="tel" className="input min-w-0 flex-1" placeholder={index === 0 ? "(00) 00000-0000 — principal" : "(00) 00000-0000"} value={telefone} onChange={(e) => setTelefones((current) => current.map((value, i) => i === index ? e.target.value : value))} />
+                {telefones.length > 1 && <button type="button" aria-label={"Remover telefone " + (index + 1)} title="Remover telefone" onClick={() => setTelefones((current) => current.filter((_, i) => i !== index))} className="rounded-lg border p-2 text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>}
+              </div>
+            ))}
+            <button type="button" onClick={() => setTelefones((current) => [...current, ""])} className="inline-flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-sm font-medium text-primary transition hover:bg-primary/5"><Plus className="h-4 w-4" /> Adicionar outro telefone</button>
+            <p className="text-xs text-muted-foreground">Adicione o telefone principal e números alternativos, se houver.</p>
+          </div>
           <Field label="E-mail *"><input required type="email" className="input" placeholder="email@exemplo.com" value={f.email} onChange={set("email")} /></Field>
           <Field label="Foto do Paciente (opcional)">
             <div className="space-y-2">
-              {f.foto && (
+              {fotoPreview && (
                 <div className="flex items-center gap-3">
-                  <img src={f.foto} alt="Foto atual do paciente" className="h-16 w-16 rounded-full object-cover" />
-                  <button type="button" onClick={() => setF((p) => ({ ...p, foto: "" }))} className="btn-ghost border text-destructive">Remover foto</button>
+                  <img src={fotoPreview} alt="Foto atual do paciente" className="h-16 w-16 rounded-full object-cover" />
+                  <button type="button" onClick={() => { setF((p) => ({ ...p, foto: "" })); setFotoPreview(""); }} className="btn-ghost border text-destructive">Remover foto</button>
                 </div>
               )}
-              <input type="file" accept="image/*" className="text-sm" onChange={(e) => onFoto(e.target.files?.[0])} />
+              <input type="file" accept="image/jpeg,image/png,image/webp" className="text-sm" disabled={uploadingPhoto} onChange={(e) => void onFoto(e.target.files?.[0])} />
+              <p className="text-xs text-muted-foreground">JPG, PNG ou WEBP; máximo 2 MB. {uploadingPhoto ? "Enviando…" : ""}</p>
             </div>
           </Field>
         </section>
@@ -68,7 +131,7 @@ export function PacienteForm({
       </div>
       <div className="mt-6 flex justify-end gap-2">
         <button type="button" onClick={onCancel} className="btn-ghost">Cancelar</button>
-        <button className="btn-primary"><Save className="h-4 w-4" /> {submitLabel}</button>
+        <button disabled={uploadingPhoto} className="btn-primary"><Save className="h-4 w-4" /> {uploadingPhoto ? "Enviando foto…" : submitLabel}</button>
       </div>
     </form>
   );

@@ -1,0 +1,35 @@
+name: Build verification
+
+on:
+  push:
+    branches:
+      - feature/supabase-foundation
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run tests
+        run: bun run test
+
+      - name: Build application
+        run: bun run build
+
+      - name: Verify Netlify output
+        run: |
+          test -d dist
+          test -f .netlify/functions-internal/nitro.json
