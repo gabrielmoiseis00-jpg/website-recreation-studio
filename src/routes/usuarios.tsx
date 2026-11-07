@@ -49,6 +49,9 @@ export const Route = createFileRoute("/usuarios")({
 function Usuarios() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [clinics, setClinics] = useState<ManagedClinic[]>([]);
+  const [clinicToDelete, setClinicToDelete] = useState<ManagedClinic | null>(null);
+  const [deleteAuth, setDeleteAuth] = useState({ username: "", password: "", confirmName: "" });
+  const [deletingClinic, setDeletingClinic] = useState(false);
   const [selectedClinicId, setSelectedClinicId] = useState("");
   const [newClinic, setNewClinic] = useState<NewClinicForm>(emptyClinicForm);
   const [newClinicLogo, setNewClinicLogo] = useState<File | null>(null);
@@ -144,19 +147,36 @@ function Usuarios() {
     }
   };
 
-  const deleteClinic = async (clinic: ManagedClinic) => {
-    if (!confirm(`Excluir o consultório "${clinic.name}"? Esta ação só será permitida se não houver usuários, pacientes, agendamentos, evoluções, dados financeiros ou prontuários vinculados.`)) return;
+  const deleteClinic = (clinic: ManagedClinic) => {
+    setClinicToDelete(clinic);
+    setDeleteAuth({ username: "", password: "", confirmName: "" });
+  };
+
+  const submitClinicDeletion = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!clinicToDelete || deletingClinic) return;
+    setDeletingClinic(true);
     try {
-      await deleteManagedClinic({ data: { clinicId: clinic.id } });
-      if (selectedClinicId === clinic.id) {
+      await deleteManagedClinic({ data: {
+        clinicId: clinicToDelete.id,
+        adminUsername: deleteAuth.username,
+        adminPassword: deleteAuth.password,
+        confirmClinicName: deleteAuth.confirmName,
+      } });
+      if (selectedClinicId === clinicToDelete.id) {
         setSelectedClinicId("");
         window.localStorage.removeItem("storbem-support-clinic-id");
         window.dispatchEvent(new Event("storbem-clinics-updated"));
       }
+      setClinicToDelete(null);
+      setDeleteAuth({ username: "", password: "", confirmName: "" });
       toast.success("Consultório excluído com sucesso.");
       await refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível excluir o consultório.");
+    } finally {
+      setDeletingClinic(false);
+      setDeleteAuth((current) => ({ ...current, password: "" }));
     }
   };
 
@@ -304,6 +324,34 @@ function Usuarios() {
           </div>)}
         </div>
       </section>}
+
+      {clinicToDelete && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="presentation">
+        <section role="dialog" aria-modal="true" aria-labelledby="delete-clinic-title" className="w-full max-w-lg space-y-4 rounded-xl border bg-card p-5 shadow-xl">
+          <div>
+            <h2 id="delete-clinic-title" className="text-lg font-semibold text-red-700">Autorizar exclusão do consultório</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Esta ação só será autorizada pela conta Suporte conectada. A senha será validada pelo Supabase e não será salva.</p>
+          </div>
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+            <strong>Consultório:</strong> {clinicToDelete.name}
+            <p className="mt-1">Nesta etapa, a exclusão continua bloqueada se houver usuários ou dados vinculados.</p>
+          </div>
+          <form onSubmit={submitClinicDeletion} className="space-y-3">
+            <label className="block space-y-1 text-sm font-medium">Usuário da conta Suporte
+              <input className="input w-full" required autoComplete="username" value={deleteAuth.username} onChange={(event) => setDeleteAuth({ ...deleteAuth, username: event.target.value })} placeholder="Digite seu usuário administrativo" />
+            </label>
+            <label className="block space-y-1 text-sm font-medium">Senha da conta Suporte
+              <input className="input w-full" required type="password" autoComplete="current-password" value={deleteAuth.password} onChange={(event) => setDeleteAuth({ ...deleteAuth, password: event.target.value })} placeholder="Digite sua senha novamente" />
+            </label>
+            <label className="block space-y-1 text-sm font-medium">Para confirmar, digite exatamente: {clinicToDelete.name}
+              <input className="input w-full" required value={deleteAuth.confirmName} onChange={(event) => setDeleteAuth({ ...deleteAuth, confirmName: event.target.value })} placeholder="Nome exato do consultório" />
+            </label>
+            <div className="flex flex-wrap justify-end gap-2 pt-2">
+              <button type="button" disabled={deletingClinic} onClick={() => { setClinicToDelete(null); setDeleteAuth({ username: "", password: "", confirmName: "" }); }} className="btn-ghost border px-4 py-2">Cancelar</button>
+              <button type="submit" disabled={deletingClinic || !deleteAuth.username.trim() || !deleteAuth.password || deleteAuth.confirmName !== clinicToDelete.name} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">{deletingClinic ? "Validando e excluindo..." : "Validar e excluir"}</button>
+            </div>
+          </form>
+        </section>
+      </div>}
 
       <form onSubmit={submit} className="grid gap-3 rounded-xl border bg-card p-5 md:grid-cols-2">
         <h2 className="font-semibold md:col-span-2">Novo usuário</h2>
