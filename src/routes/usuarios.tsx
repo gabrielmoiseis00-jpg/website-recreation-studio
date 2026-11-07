@@ -106,9 +106,9 @@ function Usuarios() {
     event.preventDefault();
     setSaving(true);
     try {
-      const cnpjDigits = newClinic.cnpj.replace(/\\D/g, "");
+      const cnpjDigits = newClinic.cnpj.replace(/\D/g, "");
       if (cnpjDigits && cnpjDigits.length !== 14) throw new Error("Informe um CNPJ com 14 números ou deixe o campo vazio.");
-      if (newClinic.logo_url && !/^https:\\/\\//i.test(newClinic.logo_url.trim())) throw new Error("O logotipo deve usar um endereço HTTPS.");
+      if (newClinic.logo_url && !/^https:\/\//i.test(newClinic.logo_url.trim())) throw new Error("O logotipo deve usar um endereço HTTPS.");
       const created = await createManagedClinic({ data: { ...newClinic, cnpj: cnpjDigits } });
       setClinics((current) => [...current, created as ManagedClinic].sort((a, b) => a.name.localeCompare(b.name)));
       setSelectedClinicId((created as ManagedClinic).id);
