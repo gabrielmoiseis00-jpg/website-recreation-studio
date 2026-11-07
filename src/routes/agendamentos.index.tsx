@@ -81,13 +81,13 @@ function Lista() {
                   <td className="p-3">{fmtDate(r.data)}</td>
                   <td className="p-3">{r.horario}</td>
                   <td className="p-3">
-                    <select className="input py-1" value={r.status} onChange={async (e) => { const n = { ...r, status: e.target.value as Status }; try { await upsertAppointment(n); setRows((current) => current.map((item) => item.id === n.id ? n : item)); } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o status."); } }}>
+                    <select className="input py-1" value={r.status} onChange={async (e) => { const n = { ...r, status: e.target.value as Status }; try { await upsertAppointment(n); setRows((current) => current.map((item) => item.id === n.id ? n : item)); toast.success(typeof navigator !== "undefined" && !navigator.onLine ? "Status salvo neste dispositivo. Aguardando sincronização." : "Status atualizado."); } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o status."); } }}>
                       {STATUS.map((x) => <option key={x} value={x}>{x}</option>)}
                     </select>
                   </td>
                   <td className="p-3 text-right whitespace-nowrap">
                     <Link to="/agendamentos/editar/$id" params={{ id: r.id }} aria-label="Editar cadastro" className="mr-3 inline-flex text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></Link>
-                    <button aria-label="Excluir" onClick={async () => { if (confirm("Excluir agendamento?")) { try { await removeAppointment(r.id); setRows((current) => current.filter((item) => item.id !== r.id)); } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível excluir o agendamento."); } } }} className="inline-flex text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                    <button aria-label="Excluir" onClick={async () => { if (confirm("Excluir agendamento?")) { try { await removeAppointment(r.id); setRows((current) => current.filter((item) => item.id !== r.id)); toast.success(typeof navigator !== "undefined" && !navigator.onLine ? "Exclusão salva neste dispositivo. Aguardando sincronização." : "Agendamento excluído."); } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível excluir o agendamento."); } } }} className="inline-flex text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                   </td>
                 </tr>
               ))}
