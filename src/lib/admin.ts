@@ -36,10 +36,18 @@ async function getAdminContext() {
   return { admin, profile, userId: auth.user.id };
 }
 
+export const getMyManagedPermissions = createServerFn({ method: "GET" }).handler(async () => {
+  const { profile } = await getAdminContext();
+  return {
+    role: profile.role as Role,
+    permissions: (profile.permissions ?? {}) as UserPermissions,
+  };
+});
+
 export const listManagedUsers = createServerFn({ method: "GET" }).handler(async () => {
   const { admin, profile } = await getAdminContext();
   let query = admin.from("profiles").select("id, username, role, active, clinic_id, created_at");
-  if (profile.role !== "suporte") query = query.eq("clinic_id", profile.clinic_id).in("role", ["secretaria", "aplicacao"]);
+  if (profile.role !== "suporte") query = query.eq("clinic_id", profile.clinic_id);
   const { data: profiles, error } = await query.order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
 
