@@ -69,8 +69,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/pacientes/': typeof PacientesIndexRoute
-  '/dashboard': typeof DashboardRoute
-  '/pacientes': typeof PacientesIndexRoute
   '/financeiro': typeof FinanceiroRoute
   '/usuarios': typeof UsuariosRoute
   '/agendamentos/$id': typeof AgendamentosIdRoute
