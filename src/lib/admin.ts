@@ -64,6 +64,7 @@ const createUserSchema = z.object({
   password: z.string().min(12).max(128),
   role: z.enum(["medico", "secretaria", "aplicacao"]),
   clinicName: z.string().trim().min(2).max(120).optional(),
+  clinicId: z.string().uuid().optional(),
 });
 
 export const createManagedUser = createServerFn({ method: "POST" })
@@ -72,13 +73,17 @@ export const createManagedUser = createServerFn({ method: "POST" })
     const { admin, profile } = await getAdminContext();
     let clinicId = profile.clinic_id as string | null;
 
-    if (profile.role === "suporte") {
-      if (data.role !== "medico" || !data.clinicName) {
-        throw new Error("Suporte deve cadastrar um médico e informar o nome do consultório.");
-      }
+    if (profile.role === "suporte" && data.role === "medico") {
+      if (!data.clinicName) throw new Error("Informe o nome do consultório.");
       const { data: clinic, error: clinicError } = await admin
         .from("clinics").insert({ name: data.clinicName }).select("id").single();
       if (clinicError || !clinic) throw new Error(clinicError?.message ?? "Não foi possível criar o consultório.");
+      clinicId = clinic.id;
+    } else if (profile.role === "suporte") {
+      if (!data.clinicId) throw new Error("Selecione o consultório para vincular este usuário.");
+      const { data: clinic, error: clinicError } = await admin
+        .from("clinics").select("id").eq("id", data.clinicId).single();
+      if (clinicError || !clinic) throw new Error("Consultório não encontrado.");
       clinicId = clinic.id;
     } else if (data.role === "medico") {
       throw new Error("Somente Suporte pode cadastrar outro médico/consultório.");
