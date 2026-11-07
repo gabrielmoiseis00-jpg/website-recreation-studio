@@ -459,6 +459,25 @@ export async function syncOfflineChanges(): Promise<{ synced: number; pending: n
   return { synced, pending: (await listOfflineQueue(userId)).length };
 }
 
+
+let automaticSyncRunning = false;
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => {
+    if (automaticSyncRunning) return;
+    automaticSyncRunning = true;
+    void syncOfflineChanges()
+      .then((result) => {
+        if (result.synced > 0) console.info(`Sincronização automática concluída: ${result.synced} alteração(ões); ${result.pending} pendente(s).`);
+      })
+      .catch((error) => {
+        // If this device was unlocked offline without a live Supabase session,
+        // the encrypted queue remains intact and is retried on the next online login.
+        console.info("A sincronização será retomada após entrar online.", error);
+      })
+      .finally(() => { automaticSyncRunning = false; });
+  });
+}
+
 export type MedicalRecord = {
   id: string;
   patientId: string;
