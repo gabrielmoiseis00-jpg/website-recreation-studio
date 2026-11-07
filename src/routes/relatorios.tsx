@@ -10,7 +10,7 @@ export const Route = createFileRoute("/relatorios")({ component: Relatorios });
 
 function Relatorios() {
   const [rows,setRows] = useState<Agendamento[]>([]);
-  const [month,setMonth] = useState(new Date().toISOString().slice(0,7));
+  const [month,setMonth] = useState(()=>{const now=new Date();return [now.getFullYear(),String(now.getMonth()+1).padStart(2,"0")].join("-");});
   const [search,setSearch] = useState("");
   const [loading,setLoading] = useState(true);
   useEffect(()=>{let active=true;listAppointments().then(data=>{if(active)setRows(data);}).catch(e=>toast.error(e instanceof Error?e.message:"Não foi possível carregar relatórios.")).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[]);
