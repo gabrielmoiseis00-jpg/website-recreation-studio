@@ -34,7 +34,7 @@ function Pacientes() {
     setBusy(true);
     try {
       await savePatient(form);
-      toast.success(form.id ? "Paciente atualizado." : "Paciente cadastrado.");
+      toast.success(typeof navigator !== "undefined" && !navigator.onLine ? "Salvo neste dispositivo. Aguardando conexão para sincronizar." : form.id ? "Paciente atualizado." : "Paciente cadastrado.");
       setForm(null);
       await refresh();
     } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível salvar o paciente."); }
@@ -45,7 +45,7 @@ function Pacientes() {
     if (!confirm(`Excluir o cadastro de ${patient.nome}? Agendamentos vinculados também podem ser removidos.`)) return;
     try {
       await removePatient(patient.id);
-      toast.success("Paciente excluído.");
+      toast.success(typeof navigator !== "undefined" && !navigator.onLine ? "Exclusão salva neste dispositivo. Aguardando sincronização." : "Paciente excluído.");
       await refresh();
     } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível excluir o paciente."); }
   }
