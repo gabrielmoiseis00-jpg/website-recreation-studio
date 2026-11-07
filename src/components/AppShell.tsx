@@ -50,7 +50,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
   }, [nav, adminOnly, medicoOnly]);
 
   const change = (t: Theme) => { setT(t); setTheme(t); };
-  const can = (area: string, action = "view") => user?.papel === "Suporte" || user?.permissions?.[area]?.[action] === true;
+  const can = (area: string, action = "view") => user?.papel === "Suporte" || user?.papel === "Médico" || user?.permissions?.[area]?.[action] === true;
   if (!user) return null;
 
   return (
