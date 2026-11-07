@@ -13,6 +13,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
   const [paleta, setPaleta] = useState(false);
   const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
   const [selectedClinicId, setSelectedClinicId] = useState("");
+  const [clinicDisplayName, setClinicDisplayName] = useState("Clínica");
 
   useEffect(() => {
     let active = true;
@@ -28,11 +29,18 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
         nav({ to: "/agendamentos" });
       } else {
         setUser(current);
+        if (current.papel !== "Suporte" && current.clinicId) {
+          void import("@/lib/supabase/client").then(({ createClient }) => createClient().from("clinics").select("name").eq("id", current.clinicId!).maybeSingle()).then(({ data }) => {
+            if (active && data?.name) setClinicDisplayName(data.name);
+          }).catch((error) => console.warn("Não foi possível carregar a identidade da clínica.", error));
+        }
         if (current.papel === "Suporte" && !hasOfflineSession()) {
           try {
             const available = await listManagedClinics();
             if (!active) return;
             setClinics(available as { id: string; name: string }[]);
+            const selectedClinic = available.find((clinic) => clinic.id === (window.localStorage.getItem("storbem-support-clinic-id") || ""));
+            if (selectedClinic) setClinicDisplayName(selectedClinic.name);
             const stored = window.localStorage.getItem("storbem-support-clinic-id") || "";
             const validStored = available.some((clinic) => clinic.id === stored);
             const next = validStored ? stored : (available[0]?.id ?? "");
@@ -89,7 +97,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
     <div className="flex min-h-screen bg-muted">
       <aside className="hidden w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
         <div className="flex items-center gap-2 px-5 py-6 text-lg font-semibold">
-          <CalendarDays className="h-5 w-5" /> Dr. Ricardo
+          <CalendarDays className="h-5 w-5" /> <span className="truncate">{clinicDisplayName}</span>
         </div>
         <nav className="flex flex-col gap-1 px-3 text-sm">
           {can("dashboard") && <Link to="/dashboard" className="nav-item" activeProps={{ className: "nav-item-active" }}><LayoutDashboard className="h-4 w-4" /> Painel inicial</Link>}
@@ -124,6 +132,7 @@ export function AppShell({ children, adminOnly, medicoOnly }: { children: ReactN
               <select aria-label="Consultório ativo" className="input max-w-48 py-1 text-xs" value={selectedClinicId} onChange={(event) => {
                 const value = event.target.value;
                 setSelectedClinicId(value);
+                setClinicDisplayName(clinics.find((clinic) => clinic.id === value)?.name ?? "Clínica");
                 window.localStorage.setItem("storbem-support-clinic-id", value);
                 window.location.reload();
               }}>
