@@ -1,4 +1,4 @@
-import { Save } from "lucide-react";
+import { Plus, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { getPatientPhotoUrl, uploadPatientPhoto } from "@/lib/supabase/data";
@@ -27,6 +27,7 @@ export function PacienteForm({
   const [f, setF] = useState<PacienteValues>(initial);
   const [fotoPreview, setFotoPreview] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [telefones, setTelefones] = useState<string[]>(initial.telefone ? initial.telefone.split(" | ").filter(Boolean) : [""]);
   const set = (k: keyof PacienteValues) => (e: { target: { value: string } }) => setF((p) => ({ ...p, [k]: e.target.value }));
 
   useEffect(() => {
@@ -78,7 +79,12 @@ export function PacienteForm({
           toast.error("Aguarde o envio da foto terminar.");
           return;
         }
-        onSubmit(f);
+        const telefonesValidos = telefones.map((telefone) => telefone.trim()).filter(Boolean);
+        if (telefonesValidos.length === 0) {
+          toast.error("Informe pelo menos um telefone do paciente.");
+          return;
+        }
+        onSubmit({ ...f, telefone: telefonesValidos.join(" | ") });
       }}
       className="rounded-xl border bg-card p-6"
     >
@@ -86,7 +92,20 @@ export function PacienteForm({
         <section className="space-y-4">
           <h2 className="font-semibold">Dados do Paciente</h2>
           <Field label="Nome Completo *"><input required className="input" placeholder="Nome completo do paciente" value={f.nome} onChange={set("nome")} /></Field>
-          <Field label="Telefone (WhatsApp) *"><input required className="input" placeholder="(00) 00000-0000" value={f.telefone} onChange={set("telefone")} /></Field>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium">Telefones (WhatsApp) *</span>
+              <span className="text-xs text-muted-foreground">{telefones.length} {telefones.length === 1 ? "telefone" : "telefones"}</span>
+            </div>
+            {telefones.map((telefone, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <input required={index === 0 || telefone.length > 0} type="tel" inputMode="tel" className="input min-w-0 flex-1" placeholder={index === 0 ? "(00) 00000-0000 — principal" : "(00) 00000-0000"} value={telefone} onChange={(e) => setTelefones((current) => current.map((value, i) => i === index ? e.target.value : value))} />
+                {telefones.length > 1 && <button type="button" aria-label={"Remover telefone " + (index + 1)} title="Remover telefone" onClick={() => setTelefones((current) => current.filter((_, i) => i !== index))} className="rounded-lg border p-2 text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>}
+              </div>
+            ))}
+            <button type="button" onClick={() => setTelefones((current) => [...current, ""])} className="inline-flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-sm font-medium text-primary transition hover:bg-primary/5"><Plus className="h-4 w-4" /> Adicionar outro telefone</button>
+            <p className="text-xs text-muted-foreground">Adicione o telefone principal e números alternativos, se houver.</p>
+          </div>
           <Field label="E-mail *"><input required type="email" className="input" placeholder="email@exemplo.com" value={f.email} onChange={set("email")} /></Field>
           <Field label="Foto do Paciente (opcional)">
             <div className="space-y-2">
