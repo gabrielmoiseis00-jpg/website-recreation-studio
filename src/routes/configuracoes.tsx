@@ -73,10 +73,10 @@ function Configuracoes() {
       if (!user || (user.papel !== "Suporte" && user.permissions?.settings?.edit !== true)) {
         throw new Error("Você não tem permissão para alterar as configurações.");
       }
-      const cnpjDigits = settings.cnpj.replace(/\\D/g, "");
-      if (settings.logo_url && !/^https:\\/\\//i.test(settings.logo_url.trim())) throw new Error("O logotipo deve usar um endereço HTTPS seguro.");
+      const cnpjDigits = settings.cnpj.replace(/\D/g, "");
+      if (settings.logo_url && !/^https:\/\//i.test(settings.logo_url.trim())) throw new Error("O logotipo deve usar um endereço HTTPS seguro.");
       if (cnpjDigits && cnpjDigits.length !== 14) throw new Error("Informe um CNPJ válido com 14 números ou deixe o campo vazio.");
-      if (settings.email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(settings.email)) {
+      if (settings.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.email)) {
         throw new Error("Informe um e-mail válido.");
       }
       const { error } = await createClient().from("clinics").update({
