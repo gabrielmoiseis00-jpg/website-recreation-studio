@@ -140,7 +140,7 @@ function Usuarios() {
               {myRole === "suporte" && <td className="p-3">{user.clinicName}</td>}
               <td className="p-3">{user.active ? "Ativo" : "Bloqueado"}</td>
               <td className="flex flex-wrap gap-2 p-3">
-                {user.role !== "suporte" && <button className="btn-ghost border px-3 py-1" onClick={() => void openPermissions(user)}>Permissões</button>}
+                {user.role !== "suporte" && (myRole === "suporte" || user.role === "secretaria" || user.role === "aplicacao") && <button className="btn-ghost border px-3 py-1" onClick={() => void openPermissions(user)}>Permissões</button>}
                 {user.role !== "suporte" && <button className="btn-ghost border px-3 py-1" onClick={() => void toggleActive(user)}>{user.active ? "Bloquear" : "Reativar"}</button>}
               </td>
             </tr>)}</tbody>
