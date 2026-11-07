@@ -98,17 +98,6 @@ export async function listAppointments(): Promise<Agendamento[]> {
   throwIfError(financesResult.error);
 
   const patients = (patientsResult.data ?? []) as unknown as PatientRow[];
-  const photoPaths = patients.map((patient) => patient.photo_path).filter((path): path is string => Boolean(path));
-  const photoUrls = new Map<string, string>();
-  if (photoPaths.length) {
-    const { data: signedPhotos, error: photoError } = await supabase.storage
-      .from(PATIENT_PHOTOS_BUCKET)
-      .createSignedUrls(photoPaths, 60);
-    throwIfError(photoError);
-    signedPhotos?.forEach((photo, index) => {
-      if (photo.signedUrl) photoUrls.set(photoPaths[index]!, photo.signedUrl);
-    });
-  }
   const appointments = (appointmentsResult.data ?? []) as unknown as AppointmentRow[];
   const progress = (progressResult.data ?? []) as unknown as ProgressRow[];
   const finances = (financesResult.data ?? []) as unknown as FinanceRow[];
@@ -131,7 +120,7 @@ export async function listAppointments(): Promise<Agendamento[]> {
       nome: patient.full_name,
       telefone: patient.phone,
       email: patient.email,
-      foto: patient.photo_path ? photoUrls.get(patient.photo_path) : undefined,
+      foto: patient.photo_path ?? undefined,
       data: appointment.appointment_date,
       horario: appointment.appointment_time.slice(0, 5),
       obs: appointment.notes,
