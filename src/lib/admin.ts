@@ -98,6 +98,7 @@ const createUserSchema = z.object({
   username: z.string().trim().min(2).max(80),
   password: z.string().min(12).max(128),
   role: z.enum(["medico", "secretaria", "aplicacao"]),
+  clinicId: z.string().uuid().optional(),
 });
 
 export const createManagedUser = createServerFn({ method: "POST" })
@@ -107,15 +108,14 @@ export const createManagedUser = createServerFn({ method: "POST" })
     let clinicId = profile.clinic_id as string | null;
 
     if (profile.role === "suporte") {
-      const { data: clinics, error: clinicsError } = await admin.from("clinics").select("id");
-      if (clinicsError) throw new Error(clinicsError.message);
-      if (!clinics || clinics.length !== 1) {
-        throw new Error("A Clínica Storbem precisa ser a única unidade cadastrada para este sistema.");
-      }
-      clinicId = clinics[0].id;
-      const { error: renameError } = await admin.from("clinics")
-        .update({ name: "Clínica Storbem" }).eq("id", clinicId);
-      if (renameError) throw new Error(renameError.message);
+      if (!data.clinicId) throw new Error("Selecione o consultório ao qual este usuário será vinculado.");
+      const { data: clinic, error: clinicError } = await admin.from("clinics")
+        .select("id").eq("id", data.clinicId).maybeSingle();
+      if (clinicError) throw new Error(clinicError.message);
+      if (!clinic) throw new Error("O consultório selecionado não existe.");
+      clinicId = clinic.id as string;
+    } else if (!clinicId) {
+      throw new Error("Sua conta não está vinculada a um consultório.");
     }
 
     if (!clinicId) throw new Error("Sua conta não está vinculada a um consultório.");
