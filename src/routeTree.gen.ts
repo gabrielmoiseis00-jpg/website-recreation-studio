@@ -116,6 +116,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/pacientes/': typeof PacientesIndexRoute
+  '/prontuarios/': typeof ProntuariosIndexRoute
   '/relatorios': typeof RelatoriosRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/financeiro': typeof FinanceiroRoute
