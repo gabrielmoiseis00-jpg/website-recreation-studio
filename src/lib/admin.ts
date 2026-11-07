@@ -152,7 +152,11 @@ export const createManagedUser = createServerFn({ method: "POST" })
 const updateUserSchema = z.object({
   userId: z.string().uuid(),
   username: z.string().trim().min(2).max(80),
-  password: z.string().optional().default(""),
+  email: z.string().email(),
+  password: z.string().max(128).optional().default(""),
+  role: z.enum(["medico", "secretaria", "aplicacao"]),
+  active: z.boolean(),
+  permissions: z.record(z.string(), z.record(z.string(), z.boolean())),
 });
 
 export const updateManagedUser = createServerFn({ method: "POST" })
@@ -160,25 +164,48 @@ export const updateManagedUser = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { admin, profile, userId } = await getAdminContext();
     if (data.userId === userId) throw new Error("Por segurança, não altere sua própria conta por esta tela.");
+
     let query = admin.from("profiles").select("id, role, clinic_id").eq("id", data.userId);
-    if (profile.role !== "suporte") query = query.eq("clinic_id", profile.clinic_id).in("role", ["secretaria", "aplicacao"]);
+    if (profile.role !== "suporte") {
+      query = query.eq("clinic_id", profile.clinic_id).in("role", ["secretaria", "aplicacao"]);
+      if (data.role === "medico") throw new Error("O Médico só pode atribuir os perfis Secretária e Aplicação.");
+    }
     const { data: target, error } = await query.maybeSingle();
     if (error) throw new Error(error.message);
     if (!target || target.role === "suporte") throw new Error("Usuário não encontrado ou sem permissão para edição.");
 
-    const { error: profileError } = await admin.from("profiles")
-      .update({ username: data.username.trim() }).eq("id", target.id);
-    if (profileError) throw new Error(profileError.message);
-
-    if (data.password.trim()) {
-      if (data.password.length < 12 || data.password.length > 128) {
-        throw new Error("A nova senha deve ter entre 12 e 128 caracteres.");
+    const allowedAreas = new Set<string>(permissionAreas);
+    const allowedActions = new Set<string>(permissionActions);
+    for (const [area, actions] of Object.entries(data.permissions)) {
+      if (!allowedAreas.has(area)) throw new Error("Área de permissão inválida.");
+      for (const [action, enabled] of Object.entries(actions)) {
+        if (!allowedActions.has(action) || typeof enabled !== "boolean") throw new Error("Ação de permissão inválida.");
       }
-      const { error: passwordError } = await admin.auth.admin.updateUserById(target.id, {
-        password: data.password,
-      });
-      if (passwordError) throw new Error("O nome foi atualizado, mas não foi possível alterar a senha: " + passwordError.message);
     }
+    const normalized: UserPermissions = {};
+    for (const area of permissionAreas) {
+      normalized[area] = {};
+      for (const action of permissionActions) normalized[area][action] = data.permissions[area]?.[action] === true;
+    }
+
+    const authUpdates: { email?: string; email_confirm?: boolean; password?: string } = {};
+    if (data.email.trim().toLowerCase() !== "") authUpdates.email = data.email.trim().toLowerCase();
+    authUpdates.email_confirm = true;
+    if (data.password.trim()) {
+      if (data.password.length < 12) throw new Error("A nova senha deve ter pelo menos 12 caracteres.");
+      authUpdates.password = data.password;
+    }
+    const { error: authUpdateError } = await admin.auth.admin.updateUserById(target.id, authUpdates);
+    if (authUpdateError) throw new Error("Não foi possível atualizar e-mail/senha: " + authUpdateError.message);
+
+    const { error: profileError } = await admin.from("profiles").update({
+      username: data.username.trim(),
+      role: data.role,
+      active: data.active,
+      permissions: normalized,
+    }).eq("id", target.id);
+    if (profileError) throw new Error("E-mail/senha atualizados, mas os dados do perfil não foram salvos: " + profileError.message);
+
     return { success: true };
   });
 
