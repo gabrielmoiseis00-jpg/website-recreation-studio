@@ -58,7 +58,7 @@ function Dashboard() {
                 <Sparkles className="h-3.5 w-3.5" /> Painel de gestão
               </div>
               <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Olá! Bem-vindo ao painel.</h1>
-              <p className="mt-2 text-sm text-white/80 sm:text-base">Acompanhe a rotina da Clínica Storbem em um só lugar.</p>
+              <p className="mt-2 text-sm text-white/80 sm:text-base">Acompanhe a rotina da sua clínica em um só lugar.</p>
               <p className="mt-4 text-sm font-medium text-white/90">{now.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</p>
             </div>
             <Link to="/agendamentos/novo" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-primary shadow-md transition hover:-translate-y-0.5 hover:bg-white/90">
@@ -143,7 +143,7 @@ function Dashboard() {
             </div>
           )}
         </section>
-        <div className="flex items-center justify-center gap-2 pb-1 text-xs text-muted-foreground"><Activity className="h-3.5 w-3.5" /> Clínica Storbem · Gestão de atendimentos</div>
+        <div className="flex items-center justify-center gap-2 pb-1 text-xs text-muted-foreground"><Activity className="h-3.5 w-3.5" /> Gestão de atendimentos</div>
       </div>
     </AppShell>
   );
