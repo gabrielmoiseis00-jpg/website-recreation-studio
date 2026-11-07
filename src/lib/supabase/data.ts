@@ -49,6 +49,14 @@ async function offlineContext() {
   return session;
 }
 
+async function pendingUpsertIds(userId: string, entity: "patient" | "appointment" | "medical_record"): Promise<Set<string>> {
+  const queue = await listOfflineQueue(userId);
+  return new Set(queue
+    .filter((item) => item.entity === entity && item.operation === "upsert")
+    .map((item) => (item.payload as { id?: string }).id)
+    .filter((id): id is string => Boolean(id)));
+}
+
 function throwIfError(error: { message: string } | null) {
   if (error) throw new Error(error.message);
 }
@@ -151,12 +159,22 @@ export async function listAppointments(): Promise<Agendamento[]> {
   const session = getOfflineSessionInfo();
   if (session) {
     const currentPatientIds = new Set(patients.map((patient) => patient.id));
+    const pendingPatientIds = await pendingUpsertIds(session.userId, "patient");
     const cachedPatients = await listOfflineRecords<PatientRecord>(session.userId, "patients");
-    for (const cached of cachedPatients) if (!currentPatientIds.has(cached.id)) await deleteOfflineRecord(session.userId, "patients", cached.id);
+    for (const cached of cachedPatients) {
+      if (!currentPatientIds.has(cached.id) && !pendingPatientIds.has(cached.id)) {
+        await deleteOfflineRecord(session.userId, "patients", cached.id);
+      }
+    }
     for (const patient of patients) await saveOfflineRecord(session.userId, "patients", patient.id, { id: patient.id, nome: patient.full_name, telefone: patient.phone, email: patient.email, foto: patient.photo_path ?? undefined, criadoEm: new Date().toISOString() });
     const currentAppointmentIds = new Set(mapped.map((appointment) => appointment.id));
+    const pendingAppointmentIds = await pendingUpsertIds(session.userId, "appointment");
     const cachedAppointments = await listOfflineRecords<Agendamento>(session.userId, "appointments");
-    for (const cached of cachedAppointments) if (!currentAppointmentIds.has(cached.id)) await deleteOfflineRecord(session.userId, "appointments", cached.id);
+    for (const cached of cachedAppointments) {
+      if (!currentAppointmentIds.has(cached.id) && !pendingAppointmentIds.has(cached.id)) {
+        await deleteOfflineRecord(session.userId, "appointments", cached.id);
+      }
+    }
     for (const appointment of mapped) await saveOfflineRecord(session.userId, "appointments", appointment.id, appointment);
   }
   return mapped;
@@ -373,14 +391,19 @@ export async function listPatients(): Promise<PatientRecord[]> {
   const session = getOfflineSessionInfo();
   if (session) {
     const currentIds = new Set(patients.map((patient) => patient.id));
+    const pendingIds = await pendingUpsertIds(session.userId, "patient");
     const cached = await listOfflineRecords<PatientRecord>(session.userId, "patients");
-    for (const item of cached) if (!currentIds.has(item.id)) await deleteOfflineRecord(session.userId, "patients", item.id);
+    for (const item of cached) {
+      if (!currentIds.has(item.id) && !pendingIds.has(item.id)) {
+        await deleteOfflineRecord(session.userId, "patients", item.id);
+      }
+    }
     for (const patient of patients) await saveOfflineRecord(session.userId, "patients", patient.id, patient);
   }
   return patients;
 }
 
-export async function savePatient(patient: Omit<PatientRecord, "criadoEm">): Promise<void> {
+export async function savePatient(patient: Omit<PatientRecord, "criadoEm"> & { __offlineNew?: boolean }): Promise<void> {
   if (isOffline()) {
     const session = await offlineContext();
     const existing = patient.id ? await readOfflineRecord<PatientRecord>(session.userId, "patients", patient.id) : undefined;
@@ -394,7 +417,7 @@ export async function savePatient(patient: Omit<PatientRecord, "criadoEm">): Pro
   }
   const supabase = createClient();
   const access = await getCurrentAccess();
-  const isEditing = Boolean(patient.id);
+  const isEditing = Boolean(patient.id) && patient.__offlineNew !== true;
   const action = isEditing ? "edit" : "create";
   if (!can(access, "patients", action)) {
     throw new Error(isEditing ? "Você não tem permissão para editar pacientes." : "Você não tem permissão para cadastrar pacientes.");
@@ -450,7 +473,7 @@ export async function syncOfflineChanges(): Promise<{ synced: number; pending: n
       if (item.entity === "patient") {
         const payload = item.payload as (PatientRecord & { __offlineNew?: boolean }) | { id: string };
         if (item.operation === "delete") await removePatient(payload.id);
-        else await savePatient(payload as PatientRecord);
+        else await savePatient(payload as PatientRecord & { __offlineNew?: boolean });
       } else if (item.entity === "medical_record") {
         const payload = item.payload as MedicalRecord | { id: string };
         if (item.operation === "delete") await removeMedicalRecord(payload.id);
