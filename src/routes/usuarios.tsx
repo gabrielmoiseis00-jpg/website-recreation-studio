@@ -95,6 +95,14 @@ function Usuarios() {
       ...current, [area]: { ...current[area], [action]: checked },
     }));
   };
+  const toggleAreaAccess = (area: typeof areas[number], enabled: boolean) => {
+    setPermissions((current) => ({
+      ...current,
+      [area.key]: Object.fromEntries(area.actions.map((action) => [
+        action, action === "view" ? enabled : (enabled ? current[area.key]?.[action] === true : false),
+      ])),
+    }));
+  };
   const savePermissions = async () => {
     if (!editing) return;
     setSaving(true);
@@ -152,10 +160,22 @@ function Usuarios() {
             <tbody>{users.map((user) => <tr key={user.id} className="border-t">
               <td className="p-3 font-medium">{user.username}</td><td className="p-3">{user.email}</td><td className="p-3">{roleLabel[user.role]}</td>
               {myRole === "suporte" && <td className="p-3">{user.clinicName}</td>}
-              <td className="p-3">{user.active ? "Ativo" : "Bloqueado"}</td>
-              <td className="flex flex-wrap gap-2 p-3">
-                {user.role !== "suporte" && (myRole === "suporte" || user.role === "secretaria" || user.role === "aplicacao") && <button className="btn-ghost border px-3 py-1" onClick={() => void openPermissions(user)}>Permissões</button>}
-                {user.role !== "suporte" && <button className="btn-ghost border px-3 py-1" onClick={() => void toggleActive(user)}>{user.active ? "Bloquear" : "Reativar"}</button>}
+              <td className="p-3">
+                <span className={user.active ? "inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700" : "inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"}>
+                  <span className={user.active ? "h-2 w-2 rounded-full bg-green-600" : "h-2 w-2 rounded-full bg-red-600"} />
+                  {user.active ? "Acesso ativo" : "Acesso bloqueado"}
+                </span>
+              </td>
+              <td className="p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  {user.role !== "suporte" && (myRole === "suporte" || user.role === "secretaria" || user.role === "aplicacao") && <button type="button" className="btn-ghost border px-3 py-2" onClick={() => void openPermissions(user)}>Configurar permissões</button>}
+                  {user.role !== "suporte" && <button type="button" role="switch" aria-checked={user.active} aria-label={user.active ? `Bloquear acesso de ${user.username}` : `Ativar acesso de ${user.username}`} className={user.active ? "inline-flex items-center gap-2 rounded-full border border-green-300 bg-green-50 px-3 py-2 text-xs font-semibold text-green-800" : "inline-flex items-center gap-2 rounded-full border border-red-300 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800"} onClick={() => void toggleActive(user)}>
+                    <span className={user.active ? "relative h-5 w-9 rounded-full bg-green-600" : "relative h-5 w-9 rounded-full bg-red-500"}>
+                      <span className={user.active ? "absolute right-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow" : "absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow"} />
+                    </span>
+                    {user.active ? "Ativo" : "Ativar"}
+                  </button>}
+                </div>
               </td>
             </tr>)}</tbody>
           </table></div>}
@@ -167,17 +187,31 @@ function Usuarios() {
             <p className="text-sm text-muted-foreground">Perfil: {roleLabel[editing.role]}. Marque os acessos que esta conta poderá utilizar.</p></div>
           <button className="btn-ghost border px-3 py-2" onClick={() => setEditing(null)}>Fechar</button>
         </div>
-        {permissionsLoading ? <p>Carregando permissões...</p> : <div className="space-y-3">
-          {areas.map((area) => <div key={area.key} className="rounded-lg border p-3">
-            <h3 className="mb-2 font-medium">{area.label}</h3>
-            <div className="flex flex-wrap gap-x-5 gap-y-2">
-              {area.actions.map((action) => <label key={action} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={permissions[area.key]?.[action] === true}
-                  onChange={(e) => changePermission(area.key, action, e.target.checked)} />
-                {actionLabel[action]}
-              </label>)}
-            </div>
-          </div>)}
+        {permissionsLoading ? <p>Carregando permissões...</p> : <div className="grid gap-3 md:grid-cols-2">
+          {areas.map((area) => {
+            const areaEnabled = permissions[area.key]?.view === true;
+            return <div key={area.key} className="rounded-xl border bg-background p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3 border-b pb-3">
+                <div>
+                  <h3 className="font-semibold">{area.label}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">Controle o que este usuário pode fazer nesta área.</p>
+                </div>
+                <label className="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-semibold">
+                  <input type="checkbox" className="peer sr-only" checked={areaEnabled}
+                    onChange={(e) => toggleAreaAccess(area, e.target.checked)} />
+                  <span className={areaEnabled ? "relative h-6 w-11 rounded-full bg-primary transition after:absolute after:right-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition" : "relative h-6 w-11 rounded-full bg-muted-foreground/30 transition after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition"} />
+                  <span>{areaEnabled ? "Ligado" : "Desligado"}</span>
+                </label>
+              </div>
+              <div className="mt-3 space-y-2">
+                {area.actions.map((action) => <label key={action} className="flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm hover:bg-muted/60">
+                  <span>{actionLabel[action]}</span>
+                  <input type="checkbox" className="h-4 w-4 accent-primary" checked={permissions[area.key]?.[action] === true}
+                    onChange={(e) => changePermission(area.key, action, e.target.checked)} />
+                </label>)}
+              </div>
+            </div>;
+          })}
         </div>}
         <div className="flex flex-wrap gap-2">
           <button disabled={saving || permissionsLoading} onClick={() => void savePermissions()} className="btn-primary">{saving ? "Salvando..." : "Salvar permissões"}</button>
