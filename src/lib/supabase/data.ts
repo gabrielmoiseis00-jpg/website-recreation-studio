@@ -85,6 +85,9 @@ function mapWeeks(rows: ProgressRow[]): Semana[] {
 export async function listAppointments(): Promise<Agendamento[]> {
   if (isOffline()) {
     const session = await offlineContext();
+    if (session.user.papel !== "Suporte" && session.user.permissions?.appointments?.view !== true && session.user.permissions?.clinical_progress?.view !== true) {
+      throw new Error("Você não tem permissão para visualizar consultas ou evoluções.");
+    }
     return (await listOfflineRecords<Agendamento>(session.userId, "appointments")).map((item) => item.value);
   }
   const supabase = createClient();
@@ -169,7 +172,9 @@ export async function upsertAppointment(appointment: Agendamento): Promise<void>
     const session = await offlineContext();
     const existing = await readOfflineRecord<Agendamento>(session.userId, "appointments", appointment.id);
     const action = existing ? "edit" : "create";
-    if (session.user.papel !== "Suporte" && session.user.permissions?.appointments?.[action] !== true) throw new Error("Você não tem permissão para alterar agendamentos offline.");
+    const canEditAppointment = session.user.papel === "Suporte" || session.user.permissions?.appointments?.[action] === true;
+    const canEditProgress = session.user.papel === "Suporte" || session.user.permissions?.clinical_progress?.[existing ? "edit" : "create"] === true;
+    if (!canEditAppointment && !canEditProgress) throw new Error("Você não tem permissão para alterar este agendamento ou sua evolução clínica offline.");
     if (!appointment.nome.trim() || !appointment.telefone.trim() || !appointment.email.trim() || !appointment.data || !appointment.horario) throw new Error("Preencha os dados obrigatórios do paciente e do agendamento.");
     await saveOfflineRecord(session.userId, "appointments", appointment.id, appointment);
     await enqueueOfflineChange(session.userId, { entity: "appointment", operation: "upsert", payload: appointment });
@@ -443,6 +448,10 @@ export async function syncOfflineChanges(): Promise<{ synced: number; pending: n
         if (item.operation === "delete") await removePatient(payload.id);
         else if ("__offlineNew" in payload && payload.__offlineNew) await savePatient({ ...(payload as PatientRecord), id: "" });
         else await savePatient(payload as PatientRecord);
+      } else if (item.entity === "medical_record") {
+        const payload = item.payload as MedicalRecord | { id: string };
+        if (item.operation === "delete") await removeMedicalRecord(payload.id);
+        else await saveMedicalRecord(payload as MedicalRecord);
       } else {
         const payload = item.payload as Agendamento | { id: string };
         if (item.operation === "delete") await removeAppointment(payload.id);
@@ -487,7 +496,19 @@ export type MedicalRecord = {
   createdAt: string;
 };
 
+function canUseMedicalRecords(user: { papel: string; permissions?: Record<string, Record<string, boolean>> }, action: string): boolean {
+  return user.papel === "Suporte" || user.permissions?.medical_records?.[action] === true;
+}
+
 export async function listMedicalRecords(): Promise<MedicalRecord[]> {
+  if (isOffline()) {
+    const session = await offlineContext();
+    if (!canUseMedicalRecords(session.user, "view")) throw new Error("Você não tem permissão para visualizar prontuários.");
+    return (await listOfflineRecords<MedicalRecord>(session.userId, "medical_records"))
+      .map((item) => item.value)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
   const supabase = createClient();
   const access = await getCurrentAccess();
   if (!can(access, "medical_records", "view")) throw new Error("Você não tem permissão para visualizar prontuários.");
@@ -496,7 +517,8 @@ export async function listMedicalRecords(): Promise<MedicalRecord[]> {
     .select("id, patient_id, title, content, created_at, patients(full_name)")
     .order("created_at", { ascending: false });
   throwIfError(error);
-  return (data ?? []).map((row) => {
+
+  const records = (data ?? []).map((row) => {
     const patient = row.patients as unknown as { full_name: string } | null;
     return {
       id: row.id as string,
@@ -507,33 +529,83 @@ export async function listMedicalRecords(): Promise<MedicalRecord[]> {
       createdAt: row.created_at as string,
     };
   });
+
+  const session = getOfflineSessionInfo();
+  if (session) {
+    const remoteIds = new Set(records.map((record) => record.id));
+    const queued = await listOfflineQueue(session.userId);
+    const pendingIds = new Set(queued.filter((item) => item.entity === "medical_record" && item.operation === "upsert")
+      .map((item) => (item.payload as MedicalRecord).id));
+    const cached = await listOfflineRecords<MedicalRecord>(session.userId, "medical_records");
+    for (const item of cached) {
+      if (!remoteIds.has(item.id) && !pendingIds.has(item.id)) {
+        await deleteOfflineRecord(session.userId, "medical_records", item.id);
+      }
+    }
+    for (const record of records) await saveOfflineRecord(session.userId, "medical_records", record.id, record);
+  }
+  return records;
 }
 
 export async function saveMedicalRecord(record: Pick<MedicalRecord, "id" | "patientId" | "title" | "content">): Promise<void> {
-  const supabase = createClient();
-  const access = await getCurrentAccess();
-  const action = record.id ? "edit" : "create";
-  if (!can(access, "medical_records", action)) throw new Error("Você não tem permissão para salvar prontuários.");
   const title = record.title.trim();
-  if (!record.patientId || !title || !record.content.trim()) {
+  const content = record.content.trim();
+  if (!record.patientId || !title || !content) {
     throw new Error("Selecione o paciente e preencha o título e o conteúdo do prontuário.");
   }
-  if (record.id) {
-    const { error } = await supabase.from("medical_records").update({ title, content: record.content.trim() }).eq("id", record.id);
+
+  if (isOffline()) {
+    const session = await offlineContext();
+    const existing = record.id ? await readOfflineRecord<MedicalRecord>(session.userId, "medical_records", record.id) : undefined;
+    const action = existing ? "edit" : "create";
+    if (!canUseMedicalRecords(session.user, action)) throw new Error("Você não tem permissão para salvar prontuários offline.");
+    const patient = await readOfflineRecord<PatientRecord>(session.userId, "patients", record.patientId);
+    if (!patient) throw new Error("Este paciente não está disponível no armazenamento offline. Conecte-se para atualizar a lista de pacientes.");
+    const value: MedicalRecord = {
+      id: record.id || crypto.randomUUID(),
+      patientId: record.patientId,
+      patientName: patient.nome,
+      title,
+      content,
+      createdAt: existing?.createdAt ?? new Date().toISOString(),
+    };
+    await saveOfflineRecord(session.userId, "medical_records", value.id, value);
+    await enqueueOfflineChange(session.userId, { entity: "medical_record", operation: "upsert", payload: value });
+    return;
+  }
+
+  const supabase = createClient();
+  const access = await getCurrentAccess();
+  const isEditing = Boolean(record.id);
+  const action = isEditing ? "edit" : "create";
+  if (!can(access, "medical_records", action)) throw new Error("Você não tem permissão para salvar prontuários.");
+  const clinicId = await getCurrentClinicId();
+  const id = record.id || crypto.randomUUID();
+  if (isEditing) {
+    const { error } = await supabase.from("medical_records")
+      .update({ title, content })
+      .eq("id", id);
     throwIfError(error);
     return;
   }
-  const clinicId = await getCurrentClinicId();
   const { error } = await supabase.from("medical_records").insert({
+    id,
     clinic_id: clinicId,
     patient_id: record.patientId,
     title,
-    content: record.content.trim(),
+    content,
   });
   throwIfError(error);
 }
 
 export async function removeMedicalRecord(id: string): Promise<void> {
+  if (isOffline()) {
+    const session = await offlineContext();
+    if (!canUseMedicalRecords(session.user, "delete")) throw new Error("Você não tem permissão para excluir prontuários offline.");
+    await deleteOfflineRecord(session.userId, "medical_records", id);
+    await enqueueOfflineChange(session.userId, { entity: "medical_record", operation: "delete", payload: { id } });
+    return;
+  }
   const access = await getCurrentAccess();
   if (!can(access, "medical_records", "delete")) throw new Error("Você não tem permissão para excluir prontuários.");
   const { error } = await createClient().from("medical_records").delete().eq("id", id);
