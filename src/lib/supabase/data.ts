@@ -46,6 +46,9 @@ function isOffline(): boolean { return typeof navigator !== "undefined" && !navi
 async function offlineContext() {
   const session = getOfflineSessionInfo();
   if (!session) throw new Error("Entre online neste dispositivo antes de usar o modo offline.");
+  if (session.user.papel === "Suporte") {
+    throw new Error("A conta de Suporte precisa estar online para selecionar e administrar consultórios com segurança.");
+  }
   return session;
 }
 
