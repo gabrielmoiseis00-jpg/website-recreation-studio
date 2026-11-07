@@ -46,11 +46,17 @@ function Usuarios() {
   const refresh = async () => {
     setLoading(true);
     try {
-      const [current, rows] = await Promise.all([getCurrentUser(), listManagedUsers()]);
+      const current = await getCurrentUser();
       if (!current || (current.papel !== "Suporte" && current.papel !== "Médico")) {
+        setMyRole(null);
         throw new Error("Acesso permitido somente para Suporte e Médico.");
       }
+
+      // Define o perfil antes de carregar a lista, para que falhas na listagem
+      // não façam o Suporte visualizar por engano o formulário de Médico.
       setMyRole(current.papel === "Suporte" ? "suporte" : "medico");
+
+      const rows = await listManagedUsers();
       setUsers(rows as ManagedUser[]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível carregar os usuários.");
