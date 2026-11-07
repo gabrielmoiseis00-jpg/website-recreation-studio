@@ -149,6 +149,39 @@ export const createManagedUser = createServerFn({ method: "POST" })
     return { success: true };
   });
 
+const updateUserSchema = z.object({
+  userId: z.string().uuid(),
+  username: z.string().trim().min(2).max(80),
+  password: z.string().optional().default(""),
+});
+
+export const updateManagedUser = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => updateUserSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { admin, profile, userId } = await getAdminContext();
+    if (data.userId === userId) throw new Error("Por segurança, não altere sua própria conta por esta tela.");
+    let query = admin.from("profiles").select("id, role, clinic_id").eq("id", data.userId);
+    if (profile.role !== "suporte") query = query.eq("clinic_id", profile.clinic_id).in("role", ["secretaria", "aplicacao"]);
+    const { data: target, error } = await query.maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!target || target.role === "suporte") throw new Error("Usuário não encontrado ou sem permissão para edição.");
+
+    const { error: profileError } = await admin.from("profiles")
+      .update({ username: data.username.trim() }).eq("id", target.id);
+    if (profileError) throw new Error(profileError.message);
+
+    if (data.password.trim()) {
+      if (data.password.length < 12 || data.password.length > 128) {
+        throw new Error("A nova senha deve ter entre 12 e 128 caracteres.");
+      }
+      const { error: passwordError } = await admin.auth.admin.updateUserById(target.id, {
+        password: data.password,
+      });
+      if (passwordError) throw new Error("O nome foi atualizado, mas não foi possível alterar a senha: " + passwordError.message);
+    }
+    return { success: true };
+  });
+
 const activeSchema = z.object({ userId: z.string().uuid(), active: z.boolean() });
 export const setManagedUserActive = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => activeSchema.parse(input))
