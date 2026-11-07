@@ -31,7 +31,7 @@ function Novo() {
         onSubmit={async (v) => {
           try {
             await upsertAppointment({ ...v, id: crypto.randomUUID(), status: "agendado", semanas: emptySemanas() });
-            toast.success("Agendamento cadastrado com sucesso");
+            toast.success(typeof navigator !== "undefined" && !navigator.onLine ? "Agendamento salvo neste dispositivo. Aguardando sincronização." : "Agendamento cadastrado com sucesso");
             nav({ to: "/agendamentos" });
           } catch (error) {
             toast.error(error instanceof Error ? error.message : "Não foi possível salvar o agendamento.");
